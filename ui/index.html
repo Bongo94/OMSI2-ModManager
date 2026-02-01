@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OMSI 2 Mod Manager</title>
+    <!-- Tailwind CSS для красоты -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            font-family: sans-serif;
+        }
+
+        .btn {
+            @apply px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-white transition;
+        }
+
+        .input {
+            @apply w-full p-2 bg-gray-700 rounded border border-gray-600 text-white;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+<!-- HEADER -->
+<header class="bg-gray-800 p-4 shadow-md flex justify-between items-center">
+    <h1 class="text-xl font-bold text-blue-400">OMSI 2 Manager</h1>
+    <div id="status" class="text-sm text-gray-400">Загрузка...</div>
+</header>
+
+<!-- CONTENT -->
+<main class="flex-1 p-6 overflow-auto">
+
+    <!-- Блок первоначальной настройки -->
+    <div id="setup-screen" class="max-w-xl mx-auto bg-gray-800 p-6 rounded-lg shadow-lg hidden">
+        <h2 class="text-lg font-bold mb-4">Настройка путей</h2>
+
+        <div class="mb-4">
+            <label class="block text-sm mb-1">Путь к папке OMSI 2:</label>
+            <div class="flex gap-2">
+                <input type="text" id="game-path-input" class="input" placeholder="C:\Games\OMSI 2">
+                <button onclick="selectGameFolder()" class="btn">...</button>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm mb-1">Где хранить моды (Mod Library):</label>
+            <div class="flex gap-2">
+                <input type="text" id="lib-path-input" class="input" placeholder="D:\OMSI_Mods">
+                <button onclick="selectLibFolder()" class="btn">...</button>
+            </div>
+        </div>
+
+        <button onclick="saveSettings()" class="w-full btn bg-green-600 hover:bg-green-500">Сохранить и начать</button>
+    </div>
+
+    <!-- Основной экран -->
+    <div id="main-screen" class="hidden h-full flex flex-col">
+        <!-- Тулбар -->
+        <div class="flex justify-between items-center mb-4 bg-gray-700 p-3 rounded">
+            <h2 class="text-xl font-bold">Библиотека модов</h2>
+            <div class="flex gap-2">
+                <button onclick="refreshModList()" class="btn bg-gray-600 text-sm">Обновить</button>
+                <button onclick="importMod()" class="btn bg-blue-600 text-sm font-bold">+ Добавить мод</button>
+            </div>
+        </div>
+
+        <!-- Таблица -->
+        <div class="flex-1 overflow-auto bg-gray-800 rounded shadow">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-gray-900 text-gray-400 sticky top-0">
+                <tr>
+                    <th class="p-3">Название</th>
+                    <th class="p-3">Тип</th>
+                    <th class="p-3">Дата</th>
+                    <th class="p-3">Статус</th>
+                    <th class="p-3">Действия</th>
+                </tr>
+                </thead>
+                <tbody id="mod-table-body" class="divide-y divide-gray-700 text-sm">
+                <!-- Сюда JS вставит строки -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Индикатор загрузки (модальное окно) -->
+        <div id="loading-modal"
+             class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+            <div class="bg-gray-800 p-8 rounded shadow-xl text-center">
+                <div class="text-2xl mb-4 animate-spin">⚙️</div>
+                <h3 class="text-xl font-bold">Идет обработка мода...</h3>
+                <p class="text-gray-400">Распаковка и анализ, подождите.</p>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<script>
+    // Функция вызывается при старте
+    window.addEventListener('pywebviewready', function () {
+        checkStatus();
+    });
+
+    async function checkStatus() {
+        // Спрашиваем у Python состояние
+        const config = await pywebview.api.get_config();
+
+        if (config.game_path && config.library_path) {
+            document.getElementById('main-screen').classList.remove('hidden');
+            document.getElementById('status').innerText = `OMSI: ${config.game_path}`;
+        } else {
+            document.getElementById('setup-screen').classList.remove('hidden');
+            document.getElementById('status').innerText = 'Требуется настройка';
+        }
+    }
+
+    async function selectGameFolder() {
+        // Вызов диалога выбора папки
+        const path = await pywebview.api.browse_folder();
+        if (path) document.getElementById('game-path-input').value = path;
+    }
+
+    async function selectLibFolder() {
+        const path = await pywebview.api.browse_folder();
+        if (path) document.getElementById('lib-path-input').value = path;
+    }
+
+    async function saveSettings() {
+        const gamePath = document.getElementById('game-path-input').value;
+        const libPath = document.getElementById('lib-path-input').value;
+
+        const resGame = await pywebview.api.set_game_path(gamePath);
+        const resLib = await pywebview.api.set_library_path(libPath);
+
+        if (resGame[0] && resLib[0]) {
+            location.reload(); // Перезагружаем интерфейс
+        } else {
+            alert(`Ошибка: ${resGame[1] || resLib[1]}`);
+        }
+    }
+
+    async function importMod() {
+        // Показываем спиннер
+        document.getElementById('loading-modal').classList.remove('hidden');
+
+        // Вызываем Python (ждем завершения)
+        const result = await pywebview.api.import_mod();
+
+        // Скрываем спиннер
+        document.getElementById('loading-modal').classList.add('hidden');
+
+        if (result) {
+            if (result.success) {
+                alert(result.message);
+                refreshModList(); // Обновляем таблицу
+            } else {
+                alert("Ошибка: " + result.message);
+            }
+        }
+    }
+
+    async function refreshModList() {
+        const mods = await pywebview.api.get_mods_list();
+        const tbody = document.getElementById('mod-table-body');
+        tbody.innerHTML = '';
+
+        mods.forEach(mod => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                    <td class="p-3 font-medium text-white">${mod.name}</td>
+                    <td class="p-3"><span class="px-2 py-1 rounded bg-gray-600 text-xs">${mod.type}</span></td>
+                    <td class="p-3 text-gray-400">${mod.date}</td>
+                    <td class="p-3">
+                        <span class="${mod.is_enabled ? 'text-green-400' : 'text-red-400'}">
+                            ${mod.is_enabled ? 'Включен' : 'Отключен'}
+                        </span>
+                    </td>
+                    <td class="p-3">
+                        <button class="text-blue-400 hover:text-blue-300 mr-2">Вкл/Выкл</button>
+                        <button class="text-red-400 hover:text-red-300">Удалить</button>
+                    </td>
+                `;
+            tbody.appendChild(tr);
+        });
+    }
+</script>
+</body>
+</html>
