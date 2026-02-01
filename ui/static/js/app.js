@@ -163,22 +163,33 @@ window.moveItem = (btn, direction) => {
 
 document.getElementById('btn-save-order').onclick = async () => {
     const container = document.getElementById('load-order-list');
-    // Собираем ID сверху вниз.
-    // UI: Верхний = Самый важный.
-    // Logic: Highest Priority (Last in List) = Winner.
-    // Значит, список из UI [Top, Mid, Bot] должен превратиться в Priority [0: Bot, 1: Mid, 2: Top]
 
+    // Мы договорились: ВЕРХНИЙ (№1) в UI = ПОБЕДИТЕЛЬ (Highest Priority).
+    // База данных работает так: Больше число Priority = Победитель.
+
+    // Значит, список из UI [ModA, ModB, ModC] (где А сверху/главный)
+    // Должен превратиться в приоритеты: A=3, B=2, C=1.
+
+    // Собираем ID сверху вниз: [IdA, IdB, IdC]
     const uiIds = Array.from(container.children).map(el => parseInt(el.dataset.id));
-    const logicIds = uiIds.reverse(); // Переворачиваем для бэкенда
+
+    // Чтобы A получил максимальный индекс при переборе enumerate(),
+    // массив должен быть [IdC, IdB, IdA].
+    const logicIds = uiIds.reverse();
 
     View.setLoading(true, "Синхронизация файлов...");
+
+    // Отправляем на сервер
     const res = await pywebview.api.save_load_order(logicIds);
+
     View.setLoading(false);
 
-    if (res.status === 'success') {
+    if(res.status === 'success') {
         document.getElementById('load-order-modal').classList.add('hidden');
-        View.addLog("Порядок загрузки обновлен.", "success");
+        View.addLog(`Порядок обновлен. Результат: ${res.message}`, "success");
+        // Обновим таблицу, вдруг статусы поменялись
+        loadMods();
     } else {
-        alert(res.message);
+        alert("Ошибка: " + res.message);
     }
 };

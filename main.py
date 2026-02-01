@@ -112,45 +112,114 @@ class Api:
         return {"status": "error", "message": msg}
 
     def get_conflicts(self):
-        """Возвращает список модов, которые конфликтуют, сгруппированных по файлам"""
+        """
+        Возвращает ТОЛЬКО те моды, которые имеют конфликты файлов (исключая Fonts).
+        """
         session = self.config_manager.session
+        # Берем только включенные моды
+        enabled_mods = session.query(Mod).filter_by(is_enabled=True).order_by(Mod.priority).all()
 
-        # Находим файлы, которые предоставляются более чем 1 включенным модом
-        # Это сложный SQL, проще сделать на Python для прототипа
+        file_map = {}  # { "Vehicles/Bus/file.cfg": [ModA, ModB] }
 
-        enabled_mods = session.query(Mod).filter_by(is_enabled=True).order_by(Mod.priority.desc()).all()
-
-        file_map = {}  # path -> [mod_name, mod_name...]
-
+        # 1. Собираем карту всех файлов
         for mod in enabled_mods:
             for f in mod.files:
-                if not f.target_game_path: continue
                 path = f.target_game_path
-                if path not in file_map: file_map[path] = []
+                if not path: continue
+
+                # НОРМАЛИЗАЦИЯ ПУТИ (важно для Windows)
+                path = path.replace("\\", "/").lower()
+
+                # ИГНОРИРУЕМ FONTS
+                if path.startswith("fonts/"):
+                    continue
+
+                if path not in file_map:
+                    file_map[path] = []
                 file_map[path].append(mod)
 
-        # Фильтруем только конфликты
-        conflicts = []
-        # Чтобы не дублировать, соберем уникальные пары или группы
+        # 2. Ищем файлы, где претендентов > 1
+        conflicting_mod_ids = set()
+        for path, mods_list in file_map.items():
+            if len(mods_list) > 1:
+                for m in mods_list:
+                    conflicting_mod_ids.add(m.id)
 
-        # Упрощенный вариант: возвращаем список включенных модов в порядке приоритета
-        # и помечаем тех, кто "перекрыт"
-
-        result_list = []
+        # 3. Формируем итоговый список модов, сохраняя их текущий порядок приоритета
+        result = []
+        # Проходим по исходному отсортированному списку, чтобы сохранить относительный порядок
         for mod in enabled_mods:
-            result_list.append({
-                "id": mod.id,
-                "name": mod.name,
-                "priority": mod.priority
-            })
+            if mod.id in conflicting_mod_ids:
+                result.append({
+                    "id": mod.id,
+                    "name": mod.name,
+                    "priority": mod.priority
+                })
 
-        return result_list
+        # Если конфликтов нет, список будет пуст
+        return result
 
-    def save_load_order(self, mod_ids):
-        """Принимает список ID в новом порядке (снизу вверх)"""
+    def save_load_order(self, ordered_mod_ids):
+        """
+        Обновляет приоритеты.
+        ordered_mod_ids: список ID конфликтных модов в порядке возрастания приоритета (СНИЗУ ВВЕРХ в UI).
+        """
         installer = ModInstaller(self.config_manager, self._logger)
-        success, msg = installer.update_load_order(mod_ids)
-        return {"status": "success" if success else "error", "message": msg}
+
+        # 1. Получаем все активные моды в текущем порядке
+        session = self.config_manager.session
+        all_active_mods = session.query(Mod).filter_by(is_enabled=True).order_by(Mod.priority).all()
+
+        # 2. Создаем маппинг для быстрой перестановки
+        # Нам нужно внедрить новый порядок (ordered_mod_ids) внутрь общего списка all_active_mods,
+        # не нарушив порядок тех модов, которые в конфликте не участвуют.
+
+        # Простая стратегия:
+        # Присвоим всем модам новые приоритеты с шагом 10.
+        # Конфликтным модам выставим приоритеты так, чтобы они выстроились как надо.
+
+        # Но самый надежный способ для пользователя:
+        # Просто переписать приоритеты переданных модов, сделав их выше остальных?
+        # Нет, это сломает логику.
+
+        # РЕШЕНИЕ: Просто обновляем приоритеты переданных модов,
+        # распределяя их равномерно, но выше предыдущего значения
+
+        try:
+            # Для простоты: просто переиндексируем ВСЕ активные моды.
+            # Но сначала переставим переданные ID в нужном порядке.
+
+            # Собираем список ID всех активных
+            full_id_list = [m.id for m in all_active_mods]
+
+            # Удаляем из общего списка те, что мы сейчас сортируем
+            for uid in ordered_mod_ids:
+                if uid in full_id_list:
+                    full_id_list.remove(uid)
+
+            # Вставляем их обратно в конец списка (так как в UI мы обычно решаем, кто "победит",
+            # а побеждает тот, кто ниже в списке / выше приоритет).
+            # В данном случае мы просто добавим их в конец, считая их "самыми важными" в текущем контексте,
+            # либо попытаемся вставить на "среднее" место.
+
+            # Давайте просто добавим их в конец списка глобального приоритета.
+            # Это гарантирует, что порядок, который выставил юзер, будет соблюден.
+            full_id_list.extend(ordered_mod_ids)
+
+            # Применяем новые приоритеты
+            for index, mod_id in enumerate(full_id_list):
+                mod = session.query(Mod).get(mod_id)
+                if mod:
+                    mod.priority = index
+
+            session.commit()  # ВАЖНО: Сохранить в БД перед вызовом установщика
+
+            # 3. Запускаем синхронизацию
+            success, msg = installer.sync_state()
+            return {"status": "success" if success else "error", "message": msg}
+
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
 
 if __name__ == '__main__':

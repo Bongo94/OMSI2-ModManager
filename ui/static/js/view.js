@@ -38,30 +38,44 @@ const View = {
     },
 
     // Добавить в объект View
-    renderLoadOrder: (mods) => {
+renderLoadOrder: (mods) => {
         const container = document.getElementById('load-order-list');
         container.innerHTML = '';
 
-        // mods приходит отсортированный по приоритету (highest last).
-        // Обычно в UI Load Order: Верхний = Самый важный (побеждает).
-        // Поэтому перевернем массив для отображения (Highest Priority First).
-        const sorted = [...mods].reverse();
+        if (!mods || mods.length === 0) {
+            container.innerHTML = '<div class="text-gray-500 text-center mt-10">Конфликтов не обнаружено.<br>Моды не пересекаются файлами (кроме Fonts).</div>';
+            return;
+        }
 
-        sorted.forEach((mod, index) => {
+        // mods приходит отсортированный по приоритету базы (0..99).
+        // 99 - это победитель. Мы хотим, чтобы Победитель был ВВЕРХУ списка (№1).
+        // Значит, сортируем массив: от большего к меньшему, перед отрисовкой.
+        // Но `get_conflicts` возвращает order_by(Mod.priority) -> [0, 1, 2...].
+        // Значит последний элемент списка API - это победитель.
+        // Нам нужно отобразить его первым.
+
+        const sortedForUI = [...mods].reverse();
+
+        sortedForUI.forEach((mod, index) => {
             const div = document.createElement('div');
-            div.className = 'flex items-center justify-between bg-gray-800 p-3 mb-2 rounded border border-gray-700 select-none cursor-move group hover:border-blue-500 transition';
-            div.dataset.id = mod.id;
+            // ... (остальной код создания элемента тот же) ...
+            // Добавим подпись "Перезаписывает всех ниже" для первого элемента
+            let badge = '';
+            if (index === 0 && mods.length > 1) {
+                badge = '<span class="text-[10px] bg-green-900 text-green-300 px-1 rounded ml-2">ГЛАВНЫЙ</span>';
+            }
 
             div.innerHTML = `
-            <div class="flex items-center gap-3">
-                <span class="text-gray-500 font-mono text-xs w-6">${index + 1}.</span>
-                <span class="font-medium text-gray-200">${mod.name}</span>
-            </div>
-            <div class="flex gap-1 opacity-50 group-hover:opacity-100">
-                <button onclick="moveItem(this, -1)" class="p-1 hover:text-white">⬆️</button>
-                <button onclick="moveItem(this, 1)" class="p-1 hover:text-white">⬇️</button>
-            </div>
-        `;
+                <div class="flex items-center gap-3">
+                    <span class="text-gray-500 font-mono text-xs w-6">${index + 1}.</span>
+                    <span class="font-medium text-gray-200">${mod.name}</span>
+                    ${badge}
+                </div>
+                <div class="flex gap-1 opacity-50 group-hover:opacity-100">
+                    <button onclick="moveItem(this, -1)" class="p-1 hover:text-white">⬆️</button>
+                    <button onclick="moveItem(this, 1)" class="p-1 hover:text-white">⬇️</button>
+                </div>
+            `;
             container.appendChild(div);
         });
     },
