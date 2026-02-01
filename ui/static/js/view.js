@@ -83,29 +83,34 @@ const View = {
         document.getElementById('review-mod-name').innerText = data.mod_name;
         document.getElementById('review-mod-type').innerText = data.type;
 
-        // Очищаем списки
         const mappedContainer = document.getElementById('mapped-rows');
         mappedContainer.innerHTML = '';
 
-        const unmappedPanel = document.getElementById('unmapped-panel');
-        // Скрываем левую панель "Ошибок", так как теперь всё мапится
-        unmappedPanel.classList.add('hidden');
+        // Скрываем левую панель "Ошибок"
+        document.getElementById('unmapped-panel').classList.add('hidden');
 
-        // Но нам нужно расширить правую панель на всю ширину
+        // Расширяем правую панель
         const rightPanel = document.getElementById('mapped-list').parentElement;
-        rightPanel.classList.remove('md:w-2/3'); // Если было ограничение ширины
+        rightPanel.classList.remove('md:w-2/3');
         rightPanel.classList.add('w-full');
 
-        // Рендер файлов
         let html = '';
         data.mapped_files.forEach(f => {
             let targetClass = 'text-green-400';
             let icon = '→';
+            let targetText = f.target;
 
-            // Если это летит в Addons (документация и прочее) - красим в желтый/серый
+            // Стилизация для Addons
             if (f.status === 'addon') {
                 targetClass = 'text-yellow-500';
-                icon = '📂'; // Значок папки
+                icon = '📂';
+            }
+
+            // Стилизация для HOF
+            if (f.status === 'hof') {
+                targetClass = 'text-purple-400 font-bold';
+                icon = '💾';
+                targetText = 'БУДЕТ ИЗВЛЕЧЕН В БИБЛИОТЕКУ';
             }
 
             html += `
@@ -114,13 +119,12 @@ const View = {
                    ${f.source}
                 </div>
                 <div class="w-1/2 break-all font-mono ${targetClass}">
-                   <span class="mr-1 opacity-50">${icon}</span> ${f.target}
+                   <span class="mr-1 opacity-50">${icon}</span> ${targetText}
                 </div>
             </div>`;
         });
 
         mappedContainer.innerHTML = html;
-
         document.getElementById('review-modal').classList.remove('hidden');
     },
 

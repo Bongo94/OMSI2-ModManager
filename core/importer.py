@@ -30,38 +30,28 @@ class ModImporter:
         Распаковывает архив с максимальной скоростью (используя extractall).
         """
         ext = archive_path.suffix.lower()
-        target_path_str = str(target_path)  # Библиотеки любят строки, а не Path объекты
+        target_path_str = str(target_path)
 
-        self.logger.log(f"Распаковка {ext} (Режим Turbo)...", "info")
-        # Ставим фейковый прогресс, чтобы юзер понимал, что процесс идет
+        self.logger.log(f"Распаковка {ext} (Turbo Mode)...", "info")
         self._progress_callback("Распаковка архива...", 50, 100)
 
         try:
             if ext == '.zip':
-                # ZIP: extractall работает быстрее циклов
                 with zipfile.ZipFile(archive_path, 'r') as zf:
                     zf.extractall(target_path_str)
 
             elif ext == '.7z':
-                # 7Z: extractall обязателен для Solid архивов и работает быстрее
-                # py7zr - это чистый Python, поэтому он все равно медленнее WinRAR/7Zip,
-                # но это самый быстрый способ без внешних .exe
                 with py7zr.SevenZipFile(archive_path, mode='r') as z:
                     z.extractall(path=target_path_str)
 
             elif ext == '.rar':
-                # RAR: Критически важно использовать extractall!
-                # Раньше мы вызывали UnRAR.exe для каждого файла (медленно).
-                # Теперь мы вызываем его 1 раз на весь архив.
                 if not os.path.exists(rarfile.UNRAR_TOOL):
                     raise FileNotFoundError(f"Не найден {rarfile.UNRAR_TOOL}!")
-
                 with rarfile.RarFile(archive_path) as rf:
                     rf.extractall(target_path_str)
             else:
                 raise Exception(f"Неподдерживаемый формат: {ext}")
 
-            # Завершили
             self._progress_callback("Распаковка завершена", 100, 100)
 
         except Exception as e:
@@ -92,12 +82,8 @@ class ModImporter:
 
         mapped_files = []
         mod_root = extract_path
-        analysis_root = structure['root_path']
+        analysis_root = structure['root_path'] or mod_root
         implicit_buses = structure.get('implicit_buses', [])
-
-        # Если корень не найден, считаем корнем саму папку распаковки, но все пойдет в Addons
-        if not analysis_root:
-            analysis_root = mod_root
 
         for root, dirs, files in os.walk(mod_root):
             for file in files:
@@ -107,41 +93,41 @@ class ModImporter:
                 target_path = None
                 status = "unmapped"
 
-                # Пробуем определить путь относительно найденного "корня игры" внутри мода
-                try:
-                    # Путь файла относительно определенного корня (например Fonts/arial.ttf)
-                    path_from_root = full_path.relative_to(analysis_root)
+                # ЛОГИКА 1: HOF файлы всегда отдельно
+                if file.lower().endswith('.hof'):
+                    status = "hof"
+                    target_path = "Хранилище HOF"  # Просто метка для UI
+                    mapped_files.append({
+                        "source": str(rel_path),
+                        "target": target_path,
+                        "status": status
+                    })
+                    continue  # Переходим к следующему файлу
 
-                    # Первый компонент пути (например 'Fonts' или '1_VOLGABUS')
+                # ЛОГИКА 2: Обычные файлы
+                try:
+                    path_from_root = full_path.relative_to(analysis_root)
                     top_folder = path_from_root.parts[0] if path_from_root.parts else ""
 
-                    # ЛОГИКА РАСПРЕДЕЛЕНИЯ
-
-                    # 1. Если это стандартная папка OMSI (Fonts, Vehicles, Maps...)
                     if top_folder.lower() in ModAnalyzer.OMSI_ROOT_FOLDERS:
                         target_path = str(path_from_root)
                         status = "mapped"
 
-                    # 2. Если это "Скрытый автобус" (папка с автобусом, лежащая в корне)
                     elif top_folder in implicit_buses:
-                        # Добавляем Vehicles к пути
                         target_path = str(Path("Vehicles") / path_from_root)
                         status = "mapped"
 
-                    # 3. Особый случай для "Голого автобуса" (когда весь архив - это одна папка автобуса)
                     elif structure.get('is_flat_bus'):
                         target_path = str(Path("Vehicles") / archive_path.stem / path_from_root)
                         status = "mapped"
-
-                    # 4. Все остальное (readme, картинки, левые папки) -> В Addons
                     else:
-                        # Используем имя мода для папки в Addons
+                        # В Addons
                         addon_subfolder = archive_path.stem
                         target_path = str(Path("Addons") / addon_subfolder / path_from_root)
-                        status = "addon"  # Специальный статус, чтобы подсветить в UI
+                        status = "addon"
 
                 except ValueError:
-                    # Файл находится "выше" корня (редкий случай, но все же кинем в Addons)
+                    # Файл вне корня -> Addons
                     addon_subfolder = archive_path.stem
                     target_path = str(Path("Addons") / addon_subfolder / rel_path)
                     status = "addon"
@@ -152,7 +138,7 @@ class ModImporter:
                     "status": status
                 })
 
-        # Подготовка данных для JS (удаляем Path объекты)
+        # Подготовка данных для JS
         structure_js = structure.copy()
         structure_js['type'] = structure['type'].value
         if structure_js.get('root_path'):
@@ -163,14 +149,13 @@ class ModImporter:
             "temp_id": str(extract_path),
             "mod_name": archive_path.stem,
             "type": structure['type'].value,
-            "mapped_files": mapped_files,  # Теперь тут ВСЕ файлы
-            "unmapped_files": [],  # Этот список теперь всегда пуст, т.к. всё уходит в Addons
+            "mapped_files": mapped_files,
+            "unmapped_files": [],
             "hof_files": structure['hof_files'],
             "structure_data": structure_js
         }
 
     def step2_confirm_import(self, preview_data):
-        """Сохраняет мод в БД."""
         extract_path = Path(preview_data['temp_id'])
         mod_name = preview_data['mod_name']
 
@@ -183,40 +168,80 @@ class ModImporter:
             is_enabled=False
         )
         self.session.add(new_mod)
-        self.session.flush()  # Получаем ID
+        self.session.flush()
 
-        # Берем маппинг прямо из preview_data, который прислал фронтенд (или пересчитываем)
-        # Надежнее взять то, что мы сгенерировали в step1, но переданное обратно
-        # В данном коде мы просто пройдемся по mapped_files из JSON
+        # Создаем специальную папку для HOF внутри мода
+        hof_storage_dir = extract_path / "_hofs"
+        hof_storage_dir.mkdir(exist_ok=True)
 
         count = 0
         for file_info in preview_data['mapped_files']:
-            is_hof = file_info['source'].lower().endswith('.hof')
+            source_path = file_info['source']
+            is_hof = file_info['status'] == 'hof'
+            target_game_path = file_info['target']
 
+            # Если это HOF, мы его ПЕРЕМЕЩАЕМ в отдельную папку и обнуляем target_game_path
+            final_source_rel_path = source_path
+
+            if is_hof:
+                target_game_path = None  # Не устанавливать в игру автоматически
+
+                # Физическое перемещение
+                original_full_path = extract_path / source_path
+                filename = original_full_path.name
+
+                # Защита от дубликатов имен хофов в одном моде
+                new_hof_path = hof_storage_dir / filename
+                if new_hof_path.exists():
+                    timestamp = int(time.time())
+                    new_hof_path = hof_storage_dir / f"{original_full_path.stem}_{timestamp}{original_full_path.suffix}"
+
+                try:
+                    # Перемещаем файл
+                    shutil.move(str(original_full_path), str(new_hof_path))
+                    # Обновляем путь источника относительно корня мода
+                    final_source_rel_path = str(new_hof_path.relative_to(extract_path))
+                except Exception as e:
+                    self.logger.log(f"Не удалось переместить HOF {filename}: {e}", "warning")
+
+            # Запись в БД
             db_file = ModFile(
                 mod_id=new_mod.id,
-                source_rel_path=file_info['source'],
-                target_game_path=file_info['target'],  # Путь уже с Addons или Vehicles
+                source_rel_path=final_source_rel_path,
+                target_game_path=target_game_path,
                 is_hof=is_hof,
                 file_hash="pending"
             )
             self.session.add(db_file)
 
+            # Если HOF - добавляем в специальную таблицу
             if is_hof:
-                # Определяем полный путь для HOF
-                full_source = extract_path / file_info['source']
                 hof_entry = HofFile(
                     mod_id=new_mod.id,
-                    filename=os.path.basename(file_info['source']),
-                    full_source_path=str(full_source),
-                    description="Найден при установке"
+                    filename=os.path.basename(final_source_rel_path),
+                    full_source_path=str(extract_path / final_source_rel_path),
+                    description="Извлечен в HOF хранилище"
                 )
                 self.session.add(hof_entry)
+
             count += 1
 
         self.session.commit()
-        self.logger.log(f"Мод сохранен! Файлов: {count}", "success")
+
+        # Очистка пустых папок после перемещения HOF
+        self._remove_empty_folders(extract_path)
+
+        self.logger.log(f"Мод сохранен! Обработано файлов: {count}", "success")
         return True
+
+    def _remove_empty_folders(self, path):
+        """Рекурсивно удаляет пустые папки (нужно после переноса HOFов)"""
+        for root, dirs, files in os.walk(path, topdown=False):
+            for name in dirs:
+                try:
+                    os.rmdir(os.path.join(root, name))
+                except OSError:
+                    pass  # Папка не пуста
 
     def cancel_import(self, temp_path):
         path = Path(temp_path)
