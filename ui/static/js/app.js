@@ -7,7 +7,7 @@ window.addLog = View.addLog;
 window.updateProgress = View.updateProgress;
 
 // --- MAIN INIT ---
-window.addEventListener('pywebviewready', async function() {
+window.addEventListener('pywebviewready', async function () {
     View.addLog("Интерфейс инициализирован.", "info");
 
     // Проверка статуса при запуске
@@ -107,4 +107,25 @@ document.getElementById('btn-cancel-import').onclick = async () => {
         View.addLog("Импорт отменен пользователем.", "warning");
         currentPreviewData = null;
     }
+};
+
+// --- ACTIONS ---
+
+window.toggleMod = async (modId) => {
+    View.setLoading(true, "Применяем изменения...");
+    const result = await pywebview.api.toggle_mod(modId);
+    View.setLoading(false);
+
+    if (result.status === 'success') {
+        loadMods(); // Перезагружаем таблицу
+    } else {
+        alert("Ошибка: " + result.message);
+    }
+};
+
+window.deleteMod = async (modId) => {
+    if (!confirm("Вы уверены, что хотите удалить этот мод?")) return;
+
+    // Пока заглушка, реализуем удаление позже
+    alert("Функция удаления будет добавлена на следующем этапе.");
 };

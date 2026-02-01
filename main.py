@@ -4,6 +4,7 @@ import webview
 from core.config import ConfigManager
 from core.database import Mod
 from core.importer import ModImporter
+from core.installer import ModInstaller
 
 
 class UILogger:
@@ -96,6 +97,20 @@ class Api:
         """Отмена импорта и удаление временных файлов."""
         importer = ModImporter(self.config_manager, self._logger)
         importer.cancel_import(temp_path)
+
+    def toggle_mod(self, mod_id):
+        """Включает или выключает мод"""
+        installer = ModInstaller(self.config_manager, self._logger)
+        try:
+            success, msg = installer.toggle_mod(mod_id)
+            if success:
+                return {"status": "success", "message": msg}
+            else:
+                self._logger.log(msg, "error")
+                return {"status": "error", "message": msg}
+        except Exception as e:
+            self._logger.log(str(e), "error")
+            return {"status": "error", "message": str(e)}
 
 
 if __name__ == '__main__':

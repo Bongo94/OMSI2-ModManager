@@ -70,8 +70,11 @@ const View = {
                     ${mod.is_enabled ? 'АКТИВЕН' : 'ОТКЛЮЧЕН'}
                 </td>
                 <td class="p-4 text-right space-x-2">
-                    <button class="text-gray-400 hover:text-white transition" title="Включить/Выключить">⏯</button>
-                    <button class="text-red-400 hover:text-red-300 transition" title="Удалить">🗑</button>
+                    <!-- ДОБАВЛЕН ONCLICK -->
+                    <button onclick="toggleMod(${mod.id})" class="text-gray-400 hover:text-white transition group" title="Включить/Выключить">
+                        <span class="group-active:scale-90 inline-block">⏯</span>
+                    </button>
+                    <button onclick="deleteMod(${mod.id})" class="text-red-400 hover:text-red-300 transition" title="Удалить">🗑</button>
                 </td>
             `;
             tbody.appendChild(tr);
