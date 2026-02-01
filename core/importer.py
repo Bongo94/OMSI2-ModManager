@@ -4,12 +4,14 @@ import zipfile
 import py7zr
 import rarfile
 import time
-from pathlib import Path
+import hashlib
 from datetime import datetime
+from pathlib import Path
 from core.database import Mod, ModFile, HofFile, ModType
 from core.analyzer import ModAnalyzer
 
 # Указываем rarfile, где искать UnRAR.exe (если он лежит рядом с main.py)
+# Если вы положили его в другое место, укажите полный путь
 rarfile.UNRAR_TOOL = "UnRAR.exe"
 
 
@@ -21,10 +23,11 @@ class ModImporter:
 
     def _progress_callback(self, item_name, current, total):
         """Callback для отправки прогресса в UI"""
-        percent = int((current / total) * 100)
-        self.logger.log(f"Распаковка: {item_name}", "progress", percent)
-        # Небольшая задержка, чтобы UI успевал обновляться
-        time.sleep(0.01)
+        percent = int((current / total) * 100) if total > 0 else 0
+        # Обновляем JS не слишком часто, чтобы не тормозить
+        if current % 10 == 0 or current == total:
+            self.logger.log(f"{current}/{total}: {item_name}", level="progress", progress=percent)
+            time.sleep(0.001)
 
     def _extract_archive(self, archive_path, target_path):
         """Распаковывает архив и сообщает о прогрессе."""
@@ -37,34 +40,26 @@ class ModImporter:
                 for i, member in enumerate(members):
                     zf.extract(member, target_path)
                     self._progress_callback(member.filename, i + 1, total_files)
-
         elif ext == '.7z':
             with py7zr.SevenZipFile(archive_path, mode='r') as z:
+                # Callback для 7zip не очень удобен, эмулируем прогресс по файлам
                 all_files = z.getnames()
                 total_files = len(all_files)
-
-                # py7zr не имеет удобного file-by-file extract, но мы можем использовать callback
-                # Создаем обертку для нашего стандартного callback
-                def py7zr_callback(filename, extracted_size, total_size):
-                    # К сожалению, py7zr не дает номера файла, поэтому прогресс будет по байтам
-                    # Для простоты будем считать по файлам, хоть это и не идеально точно
-                    try:
-                        current_index = all_files.index(filename)
-                        self._progress_callback(filename, current_index + 1, total_files)
-                    except ValueError:
-                        pass  # Пропускаем папки
-
-                z.extractall(path=target_path, callback=py7zr_callback)
-
+                for i, filename in enumerate(all_files):
+                    z.extract(targets=[filename], path=target_path)
+                    self._progress_callback(filename, i + 1, total_files)
         elif ext == '.rar':
             if not os.path.exists(rarfile.UNRAR_TOOL):
                 raise FileNotFoundError(f"Не найден {rarfile.UNRAR_TOOL}! Поместите его рядом с main.py.")
             with rarfile.RarFile(archive_path) as rf:
                 members = rf.infolist()
-                total_files = len(members)
-                for i, member in enumerate(members):
-                    rf.extract(member, str(target_path))
-                    self._progress_callback(member.filename, i + 1, total_files)
+                total_files = sum(1 for m in members if not m.isdir())
+                current_file = 0
+                for member in members:
+                    if not member.isdir():
+                        rf.extract(member, str(target_path))
+                        current_file += 1
+                        self._progress_callback(member.filename, current_file, total_files)
         else:
             raise Exception(f"Неподдерживаемый формат архива: {ext}")
 
@@ -78,7 +73,6 @@ class ModImporter:
         try:
             self.logger.log("Создание временной папки...", "info")
             extract_path.mkdir(parents=True, exist_ok=True)
-            self.logger.log("Распаковка файлов...", "info")
             self._extract_archive(archive_path, extract_path)
             self.logger.log("Распаковка завершена.", "success")
         except Exception as e:
@@ -91,9 +85,11 @@ class ModImporter:
         structure = analyzer.analyze()
         self.logger.log(f"Определен тип мода: {structure['type'].value}", "success")
         if not structure['root_path']:
-            self.logger.log("Внимание: Не удалось автоматически определить 'корень' мода.", "warning")
+            self.logger.log(
+                "Внимание: Не удалось автоматически определить 'корень' мода. Файлы могут быть не распределены.",
+                "warning")
 
-        mapped_files, unmapped_files, hof_files = [], [], []
+        mapped_files, unmapped_files = [], []
         mod_root = extract_path
         analysis_root = structure['root_path']
 
@@ -103,9 +99,6 @@ class ModImporter:
                 rel_path = full_path.relative_to(mod_root)
 
                 target_path, status = None, "unmapped"
-
-                if file.lower().endswith('.hof'):
-                    hof_files.append(str(rel_path))
 
                 if analysis_root:
                     try:
@@ -124,7 +117,11 @@ class ModImporter:
                     unmapped_files.append(file_info)
 
         if len(unmapped_files) > 0:
-            self.logger.log(f"Найдено {len(unmapped_files)} файлов без явного назначения.", "warning")
+            self.logger.log(f"Найдено {len(unmapped_files)} файлов без явного назначения", "warning")
+
+        # КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Конвертируем Enum в строку перед отправкой в JS
+        structure_for_js = structure.copy()
+        structure_for_js['type'] = structure['type'].value
 
         return {
             "temp_id": str(extract_path),
@@ -132,17 +129,18 @@ class ModImporter:
             "type": structure['type'].value,
             "mapped_files": mapped_files,
             "unmapped_files": unmapped_files,
-            "hof_files": hof_files,
-            "structure_data": structure
+            "hof_files": structure['hof_files'],  # Уже строки
+            "structure_data": structure_for_js  # Отправляем безопасную для JSON версию
         }
 
-    # _register_files остается без изменений, но убедись, что он у тебя есть
     def _register_files(self, mod, structure):
         """Проходит по файлам и записывает их в БД"""
         mod_root = Path(mod.storage_path)
         analysis_root = structure.get('root_path')
+        if analysis_root:
+            analysis_root = Path(analysis_root)  # Убедимся, что это Path объект
 
-        for root, dirs, files in os.walk(mod_root):
+        for root, _, files in os.walk(mod_root):
             for file in files:
                 full_path = Path(root) / file
                 source_rel_path = full_path.relative_to(mod_root)
@@ -169,7 +167,7 @@ class ModImporter:
                 )
                 self.session.add(db_file)
 
-                if is_hof:
+                if is_hof and target_game_path:  # HOFы, которые будут установлены
                     hof_entry = HofFile(
                         mod_id=mod.id,
                         filename=file,
@@ -182,16 +180,15 @@ class ModImporter:
         extract_path = Path(preview_data['temp_id'])
         mod_name = preview_data['mod_name']
         structure = preview_data['structure_data']
-
-        # Т.к. pywebview не может сериализовать Enum, конвертируем строку обратно
-        mod_type_str = preview_data['type']
-        structure['type'] = ModType(mod_type_str)
+        # Конвертируем обратно из строки в Path-объект, если он есть
+        if structure.get('root_path'):
+            structure['root_path'] = Path(structure['root_path'])
 
         self.logger.log("Сохранение в базу данных...", "info")
 
         new_mod = Mod(
             name=mod_name,
-            mod_type=structure['type'],
+            mod_type=ModType(preview_data['type']),
             storage_path=str(extract_path),
             is_enabled=False
         )

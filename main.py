@@ -1,19 +1,21 @@
 import json
-import webview
 import os
+import webview
 from core.config import ConfigManager
+from core.database import Mod
 from core.importer import ModImporter
-from core.database import Mod  # Импортируем Mod здесь, чтобы избежать циклического импорта
 
 
 class UILogger:
-    """Класс для отправки сообщений в веб-интерфейс"""
+    """Класс для отправки сообщений в веб-интерфейс."""
 
     def __init__(self, window):
         self._window = window
 
     def log(self, message, level="info", progress=None):
+        """Отправляет сообщение в JS-функцию addLog."""
         try:
+            # Убедимся, что сообщение - строка, и экранируем его для JS
             sanitized_msg = json.dumps(str(message))
             # Если есть прогресс, вызываем другую функцию в JS
             if level == "progress":
@@ -25,11 +27,10 @@ class UILogger:
 
 
 class Api:
-    """API, которое будет доступно из JavaScript"""
+    """API, которое доступно из JavaScript."""
 
     def __init__(self):
         self.config_manager = ConfigManager()
-        # Эти переменные будут инициализированы после создания окна
         self._window = None
         self._logger = None
 
@@ -42,7 +43,7 @@ class Api:
         """Возвращает текущие настройки путей."""
         return {
             "game_path": self.config_manager.game_path,
-            "library_path": self.config_manager.library_path
+            "library_path": self.config_manager.library_path,
         }
 
     def browse_folder(self):
@@ -69,13 +70,13 @@ class Api:
                 "name": m.name,
                 "type": m.mod_type.value if m.mod_type else "unknown",
                 "is_enabled": m.is_enabled,
-                "date": m.install_date.strftime("%Y-%m-%d %H:%M")
+                "date": m.install_date.strftime("%Y-%m-%d"),
             })
         return result
 
     def import_mod_step1(self):
         """ШАГ 1: Диалог выбора файла и запуск анализа."""
-        file_types = ('Архивы (*.zip;*.7z;*.rar)', 'All files (*.*)')
+        file_types = ('Архивы (*.zip;*.7z;*.rar)', 'Все файлы (*.*)')
         result = self._window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=False, file_types=file_types)
 
         if result and result[0]:
@@ -100,11 +101,9 @@ class Api:
 if __name__ == '__main__':
     api = Api()
 
-    # Определяем путь к HTML файлу
     current_dir = os.path.dirname(os.path.abspath(__file__))
     ui_path = os.path.join(current_dir, 'ui', 'index.html')
 
-    # Создаем окно приложения
     window = webview.create_window(
         'OMSI 2 Mod Manager',
         url=f'file://{ui_path}',
@@ -115,8 +114,7 @@ if __name__ == '__main__':
         background_color='#111827'
     )
 
-    # Передаем созданное окно в API, чтобы логгер мог работать
+    # Передаем созданное окно в API после его создания
     api.set_window(window)
 
-    # Запускаем приложение
-    webview.start(debug=True)  # debug=True включает консоль разработчика (F12)
+    webview.start(debug=True)
