@@ -26,35 +26,47 @@ class ModImporter:
             time.sleep(0.001)
 
     def _extract_archive(self, archive_path, target_path):
-        """Распаковывает архив."""
+        """
+        Распаковывает архив с максимальной скоростью (используя extractall).
+        """
         ext = archive_path.suffix.lower()
+        target_path_str = str(target_path)  # Библиотеки любят строки, а не Path объекты
 
-        if ext == '.zip':
-            with zipfile.ZipFile(archive_path, 'r') as zf:
-                members = zf.infolist()
-                for i, member in enumerate(members):
-                    zf.extract(member, target_path)
-                    self._progress_callback(member.filename, i + 1, len(members))
-        elif ext == '.7z':
-            with py7zr.SevenZipFile(archive_path, mode='r') as z:
-                all_files = z.getnames()
-                for i, filename in enumerate(all_files):
-                    z.extract(targets=[filename], path=target_path)
-                    self._progress_callback(filename, i + 1, len(all_files))
-        elif ext == '.rar':
-            if not os.path.exists(rarfile.UNRAR_TOOL):
-                raise FileNotFoundError(f"Не найден {rarfile.UNRAR_TOOL}!")
-            with rarfile.RarFile(archive_path) as rf:
-                members = rf.infolist()
-                real_files = [m for m in members if not m.isdir()]
-                count = 0
-                for member in members:
-                    if not member.isdir():
-                        rf.extract(member, str(target_path))
-                        count += 1
-                        self._progress_callback(member.filename, count, len(real_files))
-        else:
-            raise Exception(f"Неподдерживаемый формат: {ext}")
+        self.logger.log(f"Распаковка {ext} (Режим Turbo)...", "info")
+        # Ставим фейковый прогресс, чтобы юзер понимал, что процесс идет
+        self._progress_callback("Распаковка архива...", 50, 100)
+
+        try:
+            if ext == '.zip':
+                # ZIP: extractall работает быстрее циклов
+                with zipfile.ZipFile(archive_path, 'r') as zf:
+                    zf.extractall(target_path_str)
+
+            elif ext == '.7z':
+                # 7Z: extractall обязателен для Solid архивов и работает быстрее
+                # py7zr - это чистый Python, поэтому он все равно медленнее WinRAR/7Zip,
+                # но это самый быстрый способ без внешних .exe
+                with py7zr.SevenZipFile(archive_path, mode='r') as z:
+                    z.extractall(path=target_path_str)
+
+            elif ext == '.rar':
+                # RAR: Критически важно использовать extractall!
+                # Раньше мы вызывали UnRAR.exe для каждого файла (медленно).
+                # Теперь мы вызываем его 1 раз на весь архив.
+                if not os.path.exists(rarfile.UNRAR_TOOL):
+                    raise FileNotFoundError(f"Не найден {rarfile.UNRAR_TOOL}!")
+
+                with rarfile.RarFile(archive_path) as rf:
+                    rf.extractall(target_path_str)
+            else:
+                raise Exception(f"Неподдерживаемый формат: {ext}")
+
+            # Завершили
+            self._progress_callback("Распаковка завершена", 100, 100)
+
+        except Exception as e:
+            self.logger.log(f"Сбой при распаковке: {str(e)}", "error")
+            raise e
 
     def step1_prepare_preview(self, archive_path):
         archive_path = Path(archive_path)
