@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, Enum
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, Enum, inspect, text
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from datetime import datetime
 import enum
@@ -24,20 +24,16 @@ class ModType(enum.Enum):
 class Mod(Base):
     """Установленный мод (архив, распакованный в библиотеку)"""
     __tablename__ = 'mods'
-
     id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)  # Название (из имени архива или введенное)
-
-    # Тип мода (автобус, карта и т.д.)
+    name = Column(String, nullable=False)
     mod_type = Column(Enum(ModType), default=ModType.UNKNOWN)
-
-    # Путь к папке мода внутри нашей ModLibrary
     storage_path = Column(String, unique=True, nullable=False)
+    is_enabled = Column(Boolean, default=False)
 
-    is_enabled = Column(Boolean, default=False)  # Включен ли мод (активны ли симлинки)
+    # НОВОЕ: Приоритет загрузки (чем больше число, тем важнее мод)
+    priority = Column(Integer, default=0)
+
     install_date = Column(DateTime, default=datetime.now)
-
-    # Связи
     files = relationship("ModFile", back_populates="mod", cascade="all, delete-orphan")
     hof_files = relationship("HofFile", back_populates="mod", cascade="all, delete-orphan")
 
@@ -108,22 +104,22 @@ class HofInstall(Base):
 
 
 class InstalledFile(Base):
-    """
-    Состояние файловой системы игры.
-    Показывает, какие файлы сейчас заменены модами.
-    """
+    """Таблица 'Журнал изменений'. Хранит, что мы поменяли в папке игры."""
     __tablename__ = 'game_file_state'
 
     id = Column(Integer, primary_key=True)
 
-    # Путь в папке игры (относительный корень)
+    # Относительный путь в игре (Vehicles/Man/sound.cfg)
     game_path = Column(String, unique=True, nullable=False)
 
-    # Какой мод сейчас держит этот файл
+    # ID мода, чей файл сейчас установлен (победитель в конфликте)
     active_mod_id = Column(Integer, ForeignKey('mods.id'))
 
-    # Если мы заменили оригинал, здесь путь к бэкапу
+    # Если мы заменили ОРИГИНАЛЬНЫЙ файл игры, здесь лежит путь к нашему бэкапу
+    # (Например: X:/OMSI Library/Backups/sound.cfg_original_hash123)
     backup_path = Column(String, nullable=True)
+
+    # Хеш оригинального файла (для проверки целостности при восстановлении)
     original_hash = Column(String, nullable=True)
 
 
@@ -138,6 +134,22 @@ class AppSetting(Base):
 
 def init_db(db_path='manager.db'):
     engine = create_engine(f'sqlite:///{db_path}', echo=False)
+
+    # 1. Сначала создаем таблицы, если их нет (стандартный метод)
     Base.metadata.create_all(engine)
+
+    # 2. Проверяем, нужна ли миграция (добавление колонки priority)
+    inspector = inspect(engine)
+    columns = [c['name'] for c in inspector.get_columns('mods')]
+
+    if 'priority' not in columns:
+        print("Migrating database: adding 'priority' column to 'mods' table...")
+        with engine.connect() as conn:
+            # SQLite позволяет добавлять колонки простой командой ALTER TABLE
+            conn.execute(text("ALTER TABLE mods ADD COLUMN priority INTEGER DEFAULT 0"))
+            conn.commit()
+            print("Migration successful!")
+
+    # 3. Создаем сессию
     Session = sessionmaker(bind=engine)
     return Session()

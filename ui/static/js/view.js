@@ -37,6 +37,35 @@ const View = {
         container.scrollTop = container.scrollHeight;
     },
 
+    // Добавить в объект View
+    renderLoadOrder: (mods) => {
+        const container = document.getElementById('load-order-list');
+        container.innerHTML = '';
+
+        // mods приходит отсортированный по приоритету (highest last).
+        // Обычно в UI Load Order: Верхний = Самый важный (побеждает).
+        // Поэтому перевернем массив для отображения (Highest Priority First).
+        const sorted = [...mods].reverse();
+
+        sorted.forEach((mod, index) => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between bg-gray-800 p-3 mb-2 rounded border border-gray-700 select-none cursor-move group hover:border-blue-500 transition';
+            div.dataset.id = mod.id;
+
+            div.innerHTML = `
+            <div class="flex items-center gap-3">
+                <span class="text-gray-500 font-mono text-xs w-6">${index + 1}.</span>
+                <span class="font-medium text-gray-200">${mod.name}</span>
+            </div>
+            <div class="flex gap-1 opacity-50 group-hover:opacity-100">
+                <button onclick="moveItem(this, -1)" class="p-1 hover:text-white">⬆️</button>
+                <button onclick="moveItem(this, 1)" class="p-1 hover:text-white">⬇️</button>
+            </div>
+        `;
+            container.appendChild(div);
+        });
+    },
+
     // --- Таблица модов ---
     renderModList: (mods) => {
         const tbody = document.getElementById('mod-table-body');

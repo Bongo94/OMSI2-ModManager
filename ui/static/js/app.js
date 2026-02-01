@@ -129,3 +129,56 @@ window.deleteMod = async (modId) => {
     // Пока заглушка, реализуем удаление позже
     alert("Функция удаления будет добавлена на следующем этапе.");
 };
+
+
+// Обработчик кнопки
+document.getElementById('btn-conflicts').onclick = async () => {
+    const mods = await pywebview.api.get_conflicts(); // Возвращает список enabled
+    View.renderLoadOrder(mods);
+    document.getElementById('load-order-modal').classList.remove('hidden');
+};
+
+// Функция перемещения (простая реализация без Drag&Drop библиотек)
+window.moveItem = (btn, direction) => {
+    const item = btn.closest('div[data-id]');
+    const container = document.getElementById('load-order-list');
+
+    if (direction === -1) { // Вверх
+        if (item.previousElementSibling) {
+            container.insertBefore(item, item.previousElementSibling);
+        }
+    } else { // Вниз
+        if (item.nextElementSibling) {
+            container.insertBefore(item.nextElementSibling, item);
+        } else {
+            // Если последний, но нужно вниз (невозможно), но insertBefore null ставит в конец
+            // container.appendChild(item);
+        }
+    }
+    // Пересчитать цифры
+    Array.from(container.children).forEach((child, i) => {
+        child.querySelector('span').innerText = `${i + 1}.`;
+    });
+};
+
+document.getElementById('btn-save-order').onclick = async () => {
+    const container = document.getElementById('load-order-list');
+    // Собираем ID сверху вниз.
+    // UI: Верхний = Самый важный.
+    // Logic: Highest Priority (Last in List) = Winner.
+    // Значит, список из UI [Top, Mid, Bot] должен превратиться в Priority [0: Bot, 1: Mid, 2: Top]
+
+    const uiIds = Array.from(container.children).map(el => parseInt(el.dataset.id));
+    const logicIds = uiIds.reverse(); // Переворачиваем для бэкенда
+
+    View.setLoading(true, "Синхронизация файлов...");
+    const res = await pywebview.api.save_load_order(logicIds);
+    View.setLoading(false);
+
+    if (res.status === 'success') {
+        document.getElementById('load-order-modal').classList.add('hidden');
+        View.addLog("Порядок загрузки обновлен.", "success");
+    } else {
+        alert(res.message);
+    }
+};

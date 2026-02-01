@@ -99,18 +99,58 @@ class Api:
         importer.cancel_import(temp_path)
 
     def toggle_mod(self, mod_id):
-        """Включает или выключает мод"""
+        # Теперь передаем True/False, логика "переключения" внутри
+        session = self.config_manager.session
+        mod = session.query(Mod).get(mod_id)
+        current_state = mod.is_enabled
+
         installer = ModInstaller(self.config_manager, self._logger)
-        try:
-            success, msg = installer.toggle_mod(mod_id)
-            if success:
-                return {"status": "success", "message": msg}
-            else:
-                self._logger.log(msg, "error")
-                return {"status": "error", "message": msg}
-        except Exception as e:
-            self._logger.log(str(e), "error")
-            return {"status": "error", "message": str(e)}
+        success, msg = installer.toggle_mod(mod_id, not current_state)  # Инвертируем
+
+        if success:
+            return {"status": "success", "message": msg}
+        return {"status": "error", "message": msg}
+
+    def get_conflicts(self):
+        """Возвращает список модов, которые конфликтуют, сгруппированных по файлам"""
+        session = self.config_manager.session
+
+        # Находим файлы, которые предоставляются более чем 1 включенным модом
+        # Это сложный SQL, проще сделать на Python для прототипа
+
+        enabled_mods = session.query(Mod).filter_by(is_enabled=True).order_by(Mod.priority.desc()).all()
+
+        file_map = {}  # path -> [mod_name, mod_name...]
+
+        for mod in enabled_mods:
+            for f in mod.files:
+                if not f.target_game_path: continue
+                path = f.target_game_path
+                if path not in file_map: file_map[path] = []
+                file_map[path].append(mod)
+
+        # Фильтруем только конфликты
+        conflicts = []
+        # Чтобы не дублировать, соберем уникальные пары или группы
+
+        # Упрощенный вариант: возвращаем список включенных модов в порядке приоритета
+        # и помечаем тех, кто "перекрыт"
+
+        result_list = []
+        for mod in enabled_mods:
+            result_list.append({
+                "id": mod.id,
+                "name": mod.name,
+                "priority": mod.priority
+            })
+
+        return result_list
+
+    def save_load_order(self, mod_ids):
+        """Принимает список ID в новом порядке (снизу вверх)"""
+        installer = ModInstaller(self.config_manager, self._logger)
+        success, msg = installer.update_load_order(mod_ids)
+        return {"status": "success" if success else "error", "message": msg}
 
 
 if __name__ == '__main__':

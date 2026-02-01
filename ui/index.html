@@ -63,6 +63,7 @@
                 <button id="btn-refresh" class="btn-secondary text-sm">↻ Обновить</button>
                 <button id="btn-add-mod" class="btn-primary text-sm shadow-lg shadow-blue-900/50">+ Добавить мод
                 </button>
+                <button id="btn-conflicts" class="btn-secondary text-sm ml-2">⚠️ Порядок / Конфликты</button>
             </div>
         </div>
 
@@ -162,6 +163,28 @@
             </button>
             <button id="btn-confirm-import" class="btn-primary bg-green-700 hover:bg-green-600">Подтвердить установку
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- Load Order Modal -->
+<div id="load-order-modal"
+     class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-gray-800 w-[600px] h-[80%] flex flex-col rounded-xl shadow-2xl border border-gray-600">
+        <div class="p-4 border-b border-gray-700 bg-gray-900">
+            <h3 class="text-lg font-bold text-white">Порядок загрузки</h3>
+            <p class="text-xs text-gray-400">Верхние моды перезаписывают нижние. Перетащите для изменения.</p>
+        </div>
+
+        <div class="flex-1 overflow-auto p-4 custom-scrollbar bg-gray-900/50" id="load-order-list">
+            <!-- JS заполнит список -->
+        </div>
+
+        <div class="p-4 border-t border-gray-700 bg-gray-900 flex justify-between">
+            <button onclick="document.getElementById('load-order-modal').classList.add('hidden')" class="btn-secondary">
+                Закрыть
+            </button>
+            <button id="btn-save-order" class="btn-primary">Применить порядок</button>
         </div>
     </div>
 </div>
