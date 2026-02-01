@@ -241,4 +241,4 @@ if __name__ == '__main__':
     # Передаем созданное окно в API после его создания
     api.set_window(window)
 
-    webview.start(debug=True)
+    webview.start(debug=False)

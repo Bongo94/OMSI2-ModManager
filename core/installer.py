@@ -1,5 +1,3 @@
-# --- core/installer.py ---
-
 import os
 import shutil
 import hashlib
@@ -25,7 +23,6 @@ class ModInstaller:
             if mod:
                 mod.priority = index
         self.session.commit()
-        # После смены приоритета нужно пересчитать состояние файлов
         return self.sync_state()
 
     def toggle_mod(self, mod_id, enable):
@@ -35,7 +32,7 @@ class ModInstaller:
             return False, "Мод не найден"
 
         mod.is_enabled = enable
-        # Если включаем, ставим максимальный приоритет (в конец списка)
+        # Если включаем, даем высокий приоритет
         if enable:
             max_prio = self.session.query(func.max(Mod.priority)).scalar() or 0
             mod.priority = max_prio + 1
@@ -48,137 +45,180 @@ class ModInstaller:
         ГЛАВНАЯ ФУНКЦИЯ.
         Приводит папку игры в соответствие с включенными модами и их приоритетами.
         """
-        self.logger.log("Начало синхронизации файлов...", "info")
+        self.logger.log("Сбор данных...", "progress", 0)
 
-        # 1. Получаем все включенные моды, отсортированные по приоритету (0..99)
-        # Моды с высшим приоритетом перезапишут файлы модов с низшим.
+        # 1. Загружаем ВСЕ данные в память одним махом
+        # Активные моды
         active_mods = self.session.query(Mod).filter_by(is_enabled=True).order_by(Mod.priority).all()
 
-        # 2. Строим карту "Желаемого состояния": { game_path: (source_path, mod_id) }
+        # Текущее состояние файлов в игре (что мы уже установили)
+        # Превращаем в словарь: { "Vehicles/Bus/file.cfg": InstalledFileObject }
+        tracked_files_query = self.session.query(InstalledFile).all()
+        current_installed_map = {rec.game_path.replace("\\", "/").lower(): rec for rec in tracked_files_query}
+
+        # 2. Рассчитываем "Желаемое состояние" в памяти
+        # desired_state = { "путь/к/файлу": (source_path, mod_id) }
         desired_state = {}
+
+        total_files_to_process = 0
         for mod in active_mods:
             for file in mod.files:
                 if not file.target_game_path: continue
-                # Нормализуем слеши
-                path_key = file.target_game_path.replace("\\", "/")
 
-                # Записываем (или перезаписываем, если приоритет выше)
+                path_key = file.target_game_path.replace("\\", "/").lower()
                 full_source = Path(mod.storage_path) / file.source_rel_path
+
+                # Из-за сортировки active_mods по приоритету,
+                # последний записанный мод перезапишет предыдущие в словаре.
                 desired_state[path_key] = (full_source, mod.id)
 
-        # 3. Получаем "Текущее состояние" из БД (какие файлы мы контролируем)
-        tracked_files = self.session.query(InstalledFile).all()
-        tracked_map = {rec.game_path.replace("\\", "/"): rec for rec in tracked_files}
+        # 3. Составляем списки действий (Diff)
+        to_remove = []  # Список записей InstalledFile для удаления
+        to_install = []  # Список (game_path, source, mod_id) для установки
 
-        changes_count = 0
+        # А) Проверяем, что нужно УДАЛИТЬ (или заменить владельца)
+        for game_path_lower, record in current_installed_map.items():
+            # Если файла нет в желаемом состоянии
+            if game_path_lower not in desired_state:
+                to_remove.append(record)
+            # Или если владелец изменился (был МодА, стал МодБ)
+            elif desired_state[game_path_lower][1] != record.active_mod_id:
+                to_remove.append(record)
+                # Важно: если владелец сменился, мы удаляем старое,
+                # а новое добавится в шаге Б, так как ключи совпадут
+
+        # Б) Проверяем, что нужно УСТАНОВИТЬ
+        for game_path_lower, (source, mod_id) in desired_state.items():
+            # Если файла вообще нет в установленных
+            if game_path_lower not in current_installed_map:
+                to_install.append((game_path_lower, source, mod_id))
+            # Если файл есть, но мы его пометили на удаление выше (смена владельца)
+            # То его тоже надо установить заново
+            elif current_installed_map[game_path_lower] in to_remove:
+                to_install.append((game_path_lower, source, mod_id))
+            # Иначе: файл уже стоит, и мод тот же -> пропускаем (ничего делать не надо)
+
+        # 4. Выполняем действия с прогресс-баром
+        total_ops = len(to_remove) + len(to_install)
+        if total_ops == 0:
+            return True, "Изменений не требуется"
+
+        current_op = 0
         errors = []
+        new_db_records = []
 
-        # ШАГ А: Удаление файлов, которые больше не нужны (мод выключен или файл перекрыт)
-        for game_path, record in tracked_map.items():
-            # Если файла нет в желаемом состоянии ИЛИ его владельцем должен стать другой мод
-            if game_path not in desired_state or desired_state[game_path][1] != record.active_mod_id:
-                try:
-                    self._remove_installed_file(record)
-                    # Удаляем запись из сессии (она удалится из БД при commit)
-                    self.session.delete(record)
-                    changes_count += 1
-                except Exception as e:
-                    errors.append(f"Ошибка удаления {game_path}: {e}")
-
-        # Промежуточный коммит, чтобы освободить пути
-        self.session.commit()
-
-        # ШАГ Б: Установка/Обновление файлов
-        for game_path, (source_path, mod_id) in desired_state.items():
-            # Проверяем, установлен ли уже этот файл именно этим модом
-            # (Мы удалили старые записи выше, так что если запись есть - она актуальна)
-            existing_record = self.session.query(InstalledFile).filter_by(game_path=game_path).first()
-
-            if existing_record and existing_record.active_mod_id == mod_id:
-                continue  # Всё уже стоит правильно
-
+        # ШАГ 4.1: Массовое удаление
+        for record in to_remove:
             try:
-                self._install_file(game_path, source_path, mod_id)
-                changes_count += 1
+                self._remove_installed_file(record)
+                self.session.delete(record)
             except Exception as e:
-                errors.append(f"Ошибка установки {game_path}: {e}")
+                errors.append(f"Err rm {record.game_path}: {e}")
+
+            current_op += 1
+            if current_op % 20 == 0:  # Обновляем UI каждые 20 файлов (чтобы не лагало)
+                self._report_progress(current_op, total_ops, "Удаление старых файлов...")
+
+        # Промежуточный сброс, чтобы освободить базу
+        self.session.flush()
+
+        # ШАГ 4.2: Массовая установка
+        for game_path_lower, source, mod_id in to_install:
+            try:
+                # game_path_lower у нас в нижнем регистре, но для симлинка лучше брать
+                # "красивый" путь. Возьмем его из source имени или оставим как есть.
+                # Для надежности можно хранить оригинальный case, но пока так:
+
+                # Для создания InstalledFile нам нужен относительный путь
+                # А source - это Path объект
+
+                # Восстанавливаем "нормальный" путь для ОС из ключа (slashes fix)
+                target_rel_path = game_path_lower  # Можно попытаться восстановить регистр, но для Windows не критично
+
+                # Установка физически
+                backup, orig_hash = self._install_file_physically(target_rel_path, source)
+
+                # Готовим запись для БД (но не добавляем пока, чтобы быстрее)
+                new_db_records.append(InstalledFile(
+                    game_path=target_rel_path,
+                    active_mod_id=mod_id,
+                    backup_path=backup,
+                    original_hash=orig_hash
+                ))
+            except Exception as e:
+                errors.append(f"Err inst {game_path_lower}: {e}")
+
+            current_op += 1
+            if current_op % 20 == 0:
+                self._report_progress(current_op, total_ops, "Установка новых файлов...")
+
+        # ШАГ 5: Финальная запись в БД
+        self.logger.log("Сохранение базы данных...", "progress", 99)
+        if new_db_records:
+            self.session.bulk_save_objects(new_db_records)
 
         self.session.commit()
+
+        self.logger.log(f"Готово. Обработано {total_ops} файлов.", "progress", 100)
 
         if errors:
-            self.logger.log(f"Синхронизация завершена с ошибками ({len(errors)})", "warning")
-            return False, "\n".join(errors[:3])
+            self.logger.log(f"Были ошибки ({len(errors)})", "warning")
+            return False, "Завершено с ошибками"
 
-        self.logger.log(f"Синхронизация успешно завершена. Изменений: {changes_count}", "success")
-        return True, "Готово"
+        return True, "Успешно"
 
-    def _install_file(self, game_rel_path, source_full_path, mod_id):
+    def _report_progress(self, current, total, text):
+        percent = int((current / total) * 100)
+        self.logger.log(text, "progress", percent)
+
+    def _install_file_physically(self, game_rel_path, source_full_path):
+        """
+        Только работа с файловой системой. Возвращает (backup_path, hash).
+        """
         target_path = self.game_root / game_rel_path
-
-        # 1. Подготовка родительской папки
         target_path.parent.mkdir(parents=True, exist_ok=True)
 
         backup_path = None
         original_hash = None
 
-        # 2. Если по пути что-то есть
         if target_path.exists() or target_path.is_symlink():
             if target_path.is_symlink():
-                # Это старый симлинк (возможно битый), просто сносим
                 target_path.unlink()
             else:
-                # ЭТО ОРИГИНАЛЬНЫЙ ФАЙЛ ИГРЫ! НУЖЕН БЭКАП!
+                # Бэкап оригинала
                 original_hash = self._get_hash(target_path)
                 backup_name = f"{original_hash}_{target_path.name}"
                 backup_full_path = self.backup_dir / backup_name
 
-                # Перемещаем оригинал в бэкап, если его там еще нет
                 if not backup_full_path.exists():
                     shutil.move(str(target_path), str(backup_full_path))
                 else:
-                    # Если такой бэкап уже есть, оригинал можно удалить (он сохранен)
                     target_path.unlink()
 
                 backup_path = str(backup_full_path)
 
-        # 3. Создаем симлинк
         try:
             os.symlink(str(source_full_path), str(target_path))
         except OSError:
-            # Fallback для старых Windows или отсутствия прав: копирование
             shutil.copy2(str(source_full_path), str(target_path))
 
-        # 4. Пишем в журнал
-        new_record = InstalledFile(
-            game_path=str(game_rel_path).replace("\\", "/"),
-            active_mod_id=mod_id,
-            backup_path=backup_path,
-            original_hash=original_hash
-        )
-        self.session.add(new_record)
+        return backup_path, original_hash
 
     def _remove_installed_file(self, record):
         """Удаляет симлинк и восстанавливает бэкап, если он был"""
         target_path = self.game_root / record.game_path
 
-        # Удаляем наш симлинк/файл
         if target_path.exists() or target_path.is_symlink():
-            if target_path.is_dir():  # На случай ошибки, если путь стал папкой
+            if target_path.is_dir():
                 shutil.rmtree(target_path)
             else:
                 target_path.unlink()
 
-        # Восстанавливаем оригинал
         if record.backup_path:
             backup = Path(record.backup_path)
-            if backup.exists():
-                # Проверяем, не занял ли место кто-то другой (хотя логика выше должна это предотвратить)
-                if not target_path.exists():
-                    shutil.move(str(backup), str(target_path))
-                else:
-                    self.logger.log(f"Не удалось восстановить {record.game_path}: место занято.", "error")
+            if backup.exists() and not target_path.exists():
+                shutil.move(str(backup), str(target_path))
 
-        # Чистим пустые папки вверх
         self._cleanup_empty_dirs(target_path.parent)
 
     def _get_hash(self, path):
@@ -189,7 +229,7 @@ class ModInstaller:
                     hash_md5.update(chunk)
             return hash_md5.hexdigest()
         except:
-            return "error_hash"
+            return "error"
 
     def _cleanup_empty_dirs(self, path):
         try:
