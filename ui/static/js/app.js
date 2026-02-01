@@ -4,6 +4,7 @@ let currentPreviewData = null;
 // --- EXPOSED FUNCTIONS (Вызываются из Python) ---
 // ВАЖНО: Функции должны быть глобальными, чтобы Python мог их вызвать
 window.addLog = View.addLog;
+window.updateProgress = View.updateProgress;
 
 // --- MAIN INIT ---
 window.addEventListener('pywebviewready', async function() {
@@ -71,15 +72,15 @@ async function loadMods() {
 
 // 3. Импорт мода (Import Flow)
 document.getElementById('btn-add-mod').onclick = async () => {
-    // ШАГ 1: Запуск Python анализа
-    // Python сам будет слать логи в консоль во время работы
-    View.setLoading(true);
+    View.setLoading(true, "Выбор архива..."); // Изменяем текст
     const result = await pywebview.api.import_mod_step1();
-    View.setLoading(false);
+    View.setLoading(false); // Скрываем после завершения
 
     if (result) {
         currentPreviewData = result;
         View.showReviewModal(result);
+    } else {
+        View.addLog("Операция выбора файла отменена.", "warning");
     }
 };
 

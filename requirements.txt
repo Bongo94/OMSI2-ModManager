@@ -3,3 +3,4 @@ sqlalchemy
 appdirs
 py7zr
 patool
+rarfile

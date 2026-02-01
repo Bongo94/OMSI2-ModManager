@@ -10,12 +10,6 @@ const View = {
         document.getElementById('main-screen').classList.remove('hidden');
     },
 
-    setLoading: (isLoading) => {
-        const el = document.getElementById('loading-modal');
-        if (isLoading) el.classList.remove('hidden');
-        else el.classList.add('hidden');
-    },
-
     // --- Логи ---
     addLog: (msg, level) => {
         const container = document.getElementById('log-container');
@@ -25,9 +19,18 @@ const View = {
         let colorClass = 'text-gray-300';
         let prefix = 'INFO';
 
-        if (level === 'error') { colorClass = 'text-red-400 font-bold'; prefix = 'ERR'; }
-        if (level === 'warning') { colorClass = 'text-yellow-400'; prefix = 'WARN'; }
-        if (level === 'success') { colorClass = 'text-green-400'; prefix = 'OK'; }
+        if (level === 'error') {
+            colorClass = 'text-red-400 font-bold';
+            prefix = 'ERR';
+        }
+        if (level === 'warning') {
+            colorClass = 'text-yellow-400';
+            prefix = 'WARN';
+        }
+        if (level === 'success') {
+            colorClass = 'text-green-400';
+            prefix = 'OK';
+        }
 
         line.innerHTML = `<span class="text-gray-600 select-none mr-2">[${time}]</span><span class="text-xs font-bold w-8 inline-block opacity-50">${prefix}</span> <span class="${colorClass}">${msg}</span>`;
         container.appendChild(line);
@@ -107,5 +110,26 @@ const View = {
 
     hideReviewModal: () => {
         document.getElementById('review-modal').classList.add('hidden');
-    }
+    },
+
+    updateProgress: (percent, message) => {
+        const bar = document.getElementById('progress-bar');
+        const text = document.getElementById('progress-text');
+
+        bar.style.width = `${percent}%`;
+        text.innerText = message || `Прогресс: ${percent}%`;
+    },
+
+    setLoading: (isLoading, title = "Обработка...") => {
+        const el = document.getElementById('loading-modal');
+        const titleEl = document.getElementById('loading-title');
+
+        if (isLoading) {
+            titleEl.innerText = title;
+            View.updateProgress(0, 'Начинаем...'); // Сбрасываем прогресс-бар
+            el.classList.remove('hidden');
+        } else {
+            el.classList.add('hidden');
+        }
+    },
 };
