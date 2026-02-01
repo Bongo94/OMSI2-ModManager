@@ -208,41 +208,61 @@ document.getElementById('btn-hof-manager').onclick = async () => {
 };
 
 function renderHofManager(data) {
-    // 1. Рендер HOF файлов (без изменений)
+    // 1. Рендер HOF файлов
     const hofContainer = document.getElementById('hof-list-container');
     hofContainer.innerHTML = '';
     document.getElementById('hof-count').innerText = `${data.library_hofs.length} шт.`;
 
     data.library_hofs.forEach(hof => {
         const div = document.createElement('label');
-        div.className = 'flex items-start gap-2 p-2 hover:bg-gray-700 rounded cursor-pointer select-none';
+        div.className = 'flex items-start gap-2 p-2 hover:bg-gray-700 rounded cursor-pointer select-none border-b border-gray-800/50';
+
         div.innerHTML = `
             <input type="checkbox" class="mt-1 accent-purple-500 hof-checkbox" value="${hof.id}">
-            <div>
-                <div class="font-bold text-sm text-purple-100">${hof.name}</div>
-                <div class="text-[10px] text-gray-500 line-clamp-1">${hof.desc || 'Нет описания'}</div>
+            <div class="flex-1 overflow-hidden">
+                <div class="flex justify-between items-center">
+                    <div class="font-bold text-sm text-purple-100 truncate">${hof.name}</div>
+                    <!-- ИСТОЧНИК -->
+                    <div class="text-[9px] px-1.5 py-0.5 bg-gray-900 text-gray-500 rounded border border-gray-700 uppercase tracking-tighter">
+                        ${hof.mod_name}
+                    </div>
+                </div>
+                <div class="text-[10px] text-gray-500 line-clamp-1 italic">
+                    ${hof.desc || 'Нет описания'}
+                </div>
             </div>
         `;
         hofContainer.appendChild(div);
     });
 
-    // 2. Рендер Автобусов (ОБНОВЛЕНО)
+    // 2. Рендер Автобусов
     const busContainer = document.getElementById('bus-list-container');
     busContainer.innerHTML = '';
 
     if (data.buses.length === 0) {
-        busContainer.innerHTML = '<div class="text-xs text-gray-500 text-center p-4">Автобусов с [friendlyname] не найдено</div>';
+        busContainer.innerHTML = '<div class="text-xs text-gray-500 text-center p-4">Управляемых автобусов не найдено</div>';
     }
 
     data.buses.forEach(bus => {
-        // bus теперь объект: { folder: "MAN_SD200", name: "MAN SD200" }
         const div = document.createElement('label');
         div.className = 'flex items-center gap-2 p-2 hover:bg-gray-700 rounded cursor-pointer select-none border-b border-gray-800';
+
+        // Выбираем иконку
+        let icon = '🚌';
+        let typeClass = 'text-blue-400';
+
+        if (bus.type === 'car') {
+            icon = '🚗';
+            typeClass = 'text-green-400';
+        }
+
         div.innerHTML = `
-            <!-- value хранит имя папки для копирования -->
             <input type="checkbox" class="accent-blue-500 bus-checkbox" value="${bus.folder}">
-            <div class="overflow-hidden">
-                <div class="text-sm font-bold text-gray-200 truncate">${bus.name}</div>
+            <div class="overflow-hidden w-full">
+                <div class="flex justify-between">
+                    <div class="text-sm font-bold text-gray-200 truncate pr-2">${bus.name}</div>
+                    <div class="${typeClass} opacity-80" title="${bus.type}">${icon}</div>
+                </div>
                 <div class="text-[10px] font-mono text-gray-500 truncate">📁 ${bus.folder}</div>
             </div>
         `;
