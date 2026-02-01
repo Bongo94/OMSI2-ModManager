@@ -184,7 +184,7 @@ document.getElementById('btn-save-order').onclick = async () => {
 
     View.setLoading(false);
 
-    if(res.status === 'success') {
+    if (res.status === 'success') {
         document.getElementById('load-order-modal').classList.add('hidden');
         View.addLog(`Порядок обновлен. Результат: ${res.message}`, "success");
         // Обновим таблицу, вдруг статусы поменялись
@@ -192,4 +192,140 @@ document.getElementById('btn-save-order').onclick = async () => {
     } else {
         alert("Ошибка: " + res.message);
     }
+};
+
+// --- HOF MANAGER ---
+
+let foundHofsCache = []; // Для хранения результата сканирования
+
+document.getElementById('btn-hof-manager').onclick = async () => {
+    View.setLoading(true, "Загрузка списка автобусов...");
+    const data = await pywebview.api.get_hof_data();
+    View.setLoading(false);
+
+    renderHofManager(data);
+    document.getElementById('hof-modal').classList.remove('hidden');
+};
+
+function renderHofManager(data) {
+    // 1. Рендер HOF файлов (без изменений)
+    const hofContainer = document.getElementById('hof-list-container');
+    hofContainer.innerHTML = '';
+    document.getElementById('hof-count').innerText = `${data.library_hofs.length} шт.`;
+
+    data.library_hofs.forEach(hof => {
+        const div = document.createElement('label');
+        div.className = 'flex items-start gap-2 p-2 hover:bg-gray-700 rounded cursor-pointer select-none';
+        div.innerHTML = `
+            <input type="checkbox" class="mt-1 accent-purple-500 hof-checkbox" value="${hof.id}">
+            <div>
+                <div class="font-bold text-sm text-purple-100">${hof.name}</div>
+                <div class="text-[10px] text-gray-500 line-clamp-1">${hof.desc || 'Нет описания'}</div>
+            </div>
+        `;
+        hofContainer.appendChild(div);
+    });
+
+    // 2. Рендер Автобусов (ОБНОВЛЕНО)
+    const busContainer = document.getElementById('bus-list-container');
+    busContainer.innerHTML = '';
+
+    if (data.buses.length === 0) {
+        busContainer.innerHTML = '<div class="text-xs text-gray-500 text-center p-4">Автобусов с [friendlyname] не найдено</div>';
+    }
+
+    data.buses.forEach(bus => {
+        // bus теперь объект: { folder: "MAN_SD200", name: "MAN SD200" }
+        const div = document.createElement('label');
+        div.className = 'flex items-center gap-2 p-2 hover:bg-gray-700 rounded cursor-pointer select-none border-b border-gray-800';
+        div.innerHTML = `
+            <!-- value хранит имя папки для копирования -->
+            <input type="checkbox" class="accent-blue-500 bus-checkbox" value="${bus.folder}">
+            <div class="overflow-hidden">
+                <div class="text-sm font-bold text-gray-200 truncate">${bus.name}</div>
+                <div class="text-[10px] font-mono text-gray-500 truncate">📁 ${bus.folder}</div>
+            </div>
+        `;
+        busContainer.appendChild(div);
+    });
+
+    setupFilter('hof-search', 'hof-checkbox');
+    setupFilter('bus-search', 'bus-checkbox');
+}
+
+function setupFilter(inputId, checkboxClass) {
+    document.getElementById(inputId).oninput = (e) => {
+        const val = e.target.value.toLowerCase();
+        const checks = document.querySelectorAll(`.${checkboxClass}`);
+        checks.forEach(chk => {
+            const text = chk.parentElement.innerText.toLowerCase();
+            chk.parentElement.classList.toggle('hidden', !text.includes(val));
+        });
+    };
+}
+
+// Выбрать все автобусы
+document.getElementById('btn-select-all-buses').onclick = () => {
+    const checks = document.querySelectorAll('.bus-checkbox');
+    const allChecked = Array.from(checks).every(c => c.checked);
+    checks.forEach(c => {
+        if (!c.parentElement.classList.contains('hidden')) c.checked = !allChecked;
+    });
+};
+
+// Кнопка Установить
+document.getElementById('btn-install-hofs').onclick = async () => {
+    const hofIds = Array.from(document.querySelectorAll('.hof-checkbox:checked')).map(c => parseInt(c.value));
+    const busNames = Array.from(document.querySelectorAll('.bus-checkbox:checked')).map(c => c.value);
+
+    if (hofIds.length === 0 || busNames.length === 0) {
+        alert("Выберите хотя бы один HOF файл и один автобус.");
+        return;
+    }
+
+    if (!confirm(`Вы собираетесь скопировать ${hofIds.length} HOF файлов в ${busNames.length} автобусов.\nПродолжить?`)) return;
+
+    View.setLoading(true, "Копирование файлов...");
+    const res = await pywebview.api.install_hofs(hofIds, busNames);
+    View.setLoading(false);
+
+    if (res.status === 'success') {
+        View.addLog(res.message, 'success');
+        document.getElementById('hof-modal').classList.add('hidden');
+    } else {
+        alert(res.message);
+    }
+};
+
+// Сканирование из игры
+document.getElementById('btn-scan-game-hof').onclick = async () => {
+    View.setLoading(true, "Поиск HOF файлов в Vehicles...");
+    const newHofs = await pywebview.api.scan_game_hofs();
+    View.setLoading(false);
+
+    if (newHofs.length === 0) {
+        alert("Новых HOF файлов не найдено (или все уже есть в библиотеке).");
+        return;
+    }
+
+    foundHofsCache = newHofs;
+    document.getElementById('found-hof-count').innerText = newHofs.length;
+
+    const list = document.getElementById('found-hof-list');
+    list.innerHTML = newHofs.map(h => `<div>${h.name} <span class="text-gray-500 text-[10px]">(${h.path})</span></div>`).join('');
+
+    document.getElementById('hof-import-modal').classList.remove('hidden');
+};
+
+document.getElementById('btn-confirm-hof-import').onclick = async () => {
+    document.getElementById('hof-import-modal').classList.add('hidden');
+    View.setLoading(true, "Импорт...");
+    const res = await pywebview.api.import_game_hofs(foundHofsCache);
+    View.setLoading(false);
+
+    View.addLog(res.message, 'success');
+
+    // Обновляем список HOF в окне
+    const data = await pywebview.api.get_hof_data();
+    renderHofManager(data);
 };

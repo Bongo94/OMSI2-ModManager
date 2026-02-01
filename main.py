@@ -3,6 +3,7 @@ import os
 import webview
 from core.config import ConfigManager
 from core.database import Mod
+from core.hof_tools import HofTools
 from core.importer import ModImporter
 from core.installer import ModInstaller
 
@@ -220,6 +221,31 @@ class Api:
 
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+    def get_hof_data(self):
+        """Возвращает данные для окна HOF Manager: список доступных HOF и список автобусов"""
+        tools = HofTools(self.config_manager, self._logger)
+        return {
+            "library_hofs": tools.get_library_hofs(),
+            "buses": tools.scan_for_buses()
+        }
+
+    def scan_game_hofs(self):
+        """Ищет 'бесхозные' HOF в папке игры"""
+        tools = HofTools(self.config_manager, self._logger)
+        return tools.scan_existing_game_hofs()
+
+    def import_game_hofs(self, hof_list):
+        """Импортирует список"""
+        tools = HofTools(self.config_manager, self._logger)
+        count = tools.import_game_hofs(hof_list)
+        return {"status": "success", "message": f"Импортировано {count} файлов."}
+
+    def install_hofs(self, hof_ids, bus_names):
+        """Запуск установки"""
+        tools = HofTools(self.config_manager, self._logger)
+        success, msg = tools.install_hofs_to_buses(hof_ids, bus_names)
+        return {"status": "success" if success else "warning", "message": msg}
 
 
 if __name__ == '__main__':
