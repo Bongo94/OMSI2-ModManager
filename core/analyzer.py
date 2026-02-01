@@ -7,39 +7,41 @@ class ModAnalyzer:
     """
     Класс анализирует распакованную папку и определяет:
     1. Тип мода.
-    2. Где находится 'Корневая папка' (которую надо совмещать с игрой).
-    3. Список всех файлов и HOF файлов.
+    2. Где находится 'Корневая папка'.
+    3. Какие папки являются 'скрытыми автобусами' (лежат в корне, но без папки Vehicles).
     """
 
     # Папки, которые точно относятся к корню игры
     OMSI_ROOT_FOLDERS = {
         'vehicles', 'maps', 'sceneryobjects', 'splines',
         'fonts', 'texture', 'sound', 'inputs', 'gui',
-        'drivers', 'ticketpacks', 'money'
+        'drivers', 'ticketpacks', 'money', 'trains',
+        'humans', 'addons'
     }
 
     def __init__(self, mod_path):
         self.mod_path = Path(mod_path)
         self.structure = {
             'type': ModType.UNKNOWN,
-            'root_path': None,  # Путь внутри мода, который является 'корнем'
-            'hof_files': [],  # Список найденных HOF
-            'is_flat_bus': False  # Флаг: если в корне сразу лежат папки Model/Sound (кривой мод)
+            'root_path': None,
+            'hof_files': [],
+            'implicit_buses': [],  # Список папок, которые надо закинуть в Vehicles
+            'is_flat_bus': False
         }
 
     def analyze(self):
-        # 1. Сначала ищем HOF файлы по всему моду
         self._find_hof_files()
 
-        # 2. Пытаемся найти корень игры
-        root_candidate, depth = self._find_omsi_root()
+        # Поиск корня
+        root_candidate, implicit_buses = self._find_omsi_root_smart()
 
         if root_candidate:
             self.structure['root_path'] = root_candidate
-            self.structure['type'] = self._determine_type_by_content(root_candidate)
+            self.structure['implicit_buses'] = implicit_buses
+            self.structure['type'] = self._determine_type_by_content(root_candidate, implicit_buses)
         else:
-            # Если явного корня нет, проверяем, не является ли это "голым" автобусом
-            if self._check_flat_bus_structure(self.mod_path):
+            # Если совсем ничего не нашли, проверяем на "голый" автобус
+            if self._is_bus_dir(self.mod_path):
                 self.structure['type'] = ModType.BUS
                 self.structure['is_flat_bus'] = True
                 self.structure['root_path'] = self.mod_path
@@ -50,90 +52,90 @@ class ModAnalyzer:
 
     def _find_hof_files(self):
         for path in self.mod_path.rglob('*.hof'):
-            # Сохраняем путь относительно корня мода
-            rel_path = path.relative_to(self.mod_path)
-            self.structure['hof_files'].append(str(rel_path))
+            try:
+                rel_path = path.relative_to(self.mod_path)
+                self.structure['hof_files'].append(str(rel_path))
+            except:
+                pass
 
-    def _find_omsi_root(self):
-        """
-        Ищет папку, содержащую ключевые папки OMSI (Vehicles, Maps и т.д.)
-        Возвращает (Path, depth)
-        """
-        # Сначала проверим сам корень
-        if self._count_omsi_folders(self.mod_path) >= 1:
-            return self.mod_path, 0
+    def _is_bus_dir(self, path):
+        """Проверяет, похоже ли содержимое папки на автобус (есть Model + Sound)"""
+        has_model = False
+        has_sound = False
+        if not path.is_dir(): return False
+        try:
+            for item in path.iterdir():
+                if item.is_dir():
+                    if item.name.lower() == 'model': has_model = True
+                    if item.name.lower() == 'sound': has_sound = True
+        except:
+            pass
+        return has_model and has_sound
 
-        # Если нет, идем вглубь (но не слишком глубоко)
+    def _find_omsi_root_smart(self):
+        """
+        Ищет корень, учитывая и стандартные папки, и папки-автобусы, лежащие рядом.
+        Возвращает (Path root, List[str] implicit_buses)
+        """
         max_score = 0
-        best_candidate = None
+        best_root = None
+        best_buses = []
 
+        # Сканируем в глубину до 3 уровней
         for root, dirs, files in os.walk(self.mod_path):
             current_path = Path(root)
-            # Защита от слишком глубокого поиска
-            if len(current_path.relative_to(self.mod_path).parts) > 3:
+            # Защита от глубокого ухода
+            try:
+                if len(current_path.relative_to(self.mod_path).parts) > 3:
+                    continue
+            except:
                 continue
 
-            score = self._count_omsi_folders(current_path)
+            score = 0
+            current_buses = []
 
-            # Если нашли Vehicles - это очень сильный сигнал
+            # 1. Проверяем наличие стандартных папок (Fonts, Vehicles, Maps...)
             for d in dirs:
-                if d.lower() == 'vehicles':
-                    score += 5
-                if d.lower() == 'maps':
-                    score += 3
+                d_lower = d.lower()
+                if d_lower in self.OMSI_ROOT_FOLDERS:
+                    score += 2  # Стандартная папка — хороший знак
+                    if d_lower == 'vehicles': score += 5
+                    if d_lower == 'maps': score += 5
 
+                # 2. Проверяем, не является ли папка "скрытым автобусом"
+                # (То есть внутри неё есть Model/Sound, но сама она не Vehicles)
+                elif self._is_bus_dir(current_path / d):
+                    score += 3
+                    current_buses.append(d)
+
+            # Если мы нашли хоть что-то значимое
             if score > max_score:
                 max_score = score
-                best_candidate = current_path
+                best_root = current_path
+                best_buses = current_buses
+
+            # Если score одинаковый, предпочитаем тот путь, который короче (ближе к началу)
+            elif score == max_score and score > 0:
+                if best_root and len(str(current_path)) < len(str(best_root)):
+                    best_root = current_path
+                    best_buses = current_buses
 
         if max_score > 0:
-            return best_candidate, max_score
-        return None, 0
+            return best_root, best_buses
 
-    def _count_omsi_folders(self, path):
-        count = 0
-        try:
-            for item in path.iterdir():
-                if item.is_dir() and item.name.lower() in self.OMSI_ROOT_FOLDERS:
-                    count += 1
-        except:
-            pass
-        return count
+        return None, []
 
-    def _check_flat_bus_structure(self, path):
-        """Проверяет, не лежат ли папки Model/Sound прямо здесь"""
-        required = {'model', 'sound', 'script'}
-        found = set()
-        try:
-            for item in path.iterdir():
-                if item.is_dir() and item.name.lower() in required:
-                    found.add(item.name.lower())
-                # Или если есть .bus/.ovh файл прямо тут
-                if item.is_file() and item.suffix.lower() in ['.bus', '.ovh']:
-                    return True
-        except:
-            pass
-        return len(found) >= 2
-
-    def _determine_type_by_content(self, root_path):
-        """Определяет тип на основе того, какие папки есть в найденном корне"""
-        has_vehicles = (root_path / 'Vehicles').exists() or (root_path / 'vehicles').exists()
+    def _determine_type_by_content(self, root_path, implicit_buses):
+        has_vehicles = (root_path / 'vehicles').exists() or (root_path / 'Vehicles').exists() or len(implicit_buses) > 0
         has_maps = (root_path / 'maps').exists() or (root_path / 'Maps').exists()
 
-        if has_vehicles and has_maps:
-            return ModType.MIXED
-        if has_vehicles:
-            return ModType.BUS
-        if has_maps:
-            return ModType.MAP
+        if has_vehicles and has_maps: return ModType.MIXED
+        if has_vehicles: return ModType.BUS
+        if has_maps: return ModType.MAP
 
-        # Проверка на Scenery
-        has_scenery = False
-        for folder in ['Sceneryobjects', 'Splines', 'Texture']:
+        # Проверка на Scenery/Splines
+        for folder in ['Sceneryobjects', 'Splines', 'Texture', 'Fonts']:
             if (root_path / folder).exists() or (root_path / folder.lower()).exists():
-                has_scenery = True
-
-        if has_scenery:
-            return ModType.SCENERY
+                return ModType.SCENERY
 
         return ModType.UNKNOWN

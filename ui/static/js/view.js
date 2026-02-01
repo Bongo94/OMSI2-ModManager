@@ -83,27 +83,43 @@ const View = {
         document.getElementById('review-mod-name').innerText = data.mod_name;
         document.getElementById('review-mod-type').innerText = data.type;
 
-        // Рендер файлов для установки
+        // Очищаем списки
         const mappedContainer = document.getElementById('mapped-rows');
-        mappedContainer.innerHTML = data.mapped_files.map(f => `
-            <div class="flex p-2 hover:bg-gray-700/30">
-                <div class="w-1/2 break-all pr-2 text-gray-400">${f.source}</div>
-                <div class="w-1/2 break-all text-green-400 font-mono">→ ${f.target}</div>
-            </div>
-        `).join('');
+        mappedContainer.innerHTML = '';
 
-        // Рендер мусора
-        const unmappedList = document.getElementById('unmapped-list');
         const unmappedPanel = document.getElementById('unmapped-panel');
+        // Скрываем левую панель "Ошибок", так как теперь всё мапится
+        unmappedPanel.classList.add('hidden');
 
-        if (data.unmapped_files.length > 0) {
-            unmappedPanel.classList.remove('hidden');
-            unmappedList.innerHTML = data.unmapped_files.map(f => `
-                <div class="break-all border-b border-red-900/20 pb-1 mb-1">${f.source}</div>
-            `).join('');
-        } else {
-            unmappedPanel.classList.add('hidden');
-        }
+        // Но нам нужно расширить правую панель на всю ширину
+        const rightPanel = document.getElementById('mapped-list').parentElement;
+        rightPanel.classList.remove('md:w-2/3'); // Если было ограничение ширины
+        rightPanel.classList.add('w-full');
+
+        // Рендер файлов
+        let html = '';
+        data.mapped_files.forEach(f => {
+            let targetClass = 'text-green-400';
+            let icon = '→';
+
+            // Если это летит в Addons (документация и прочее) - красим в желтый/серый
+            if (f.status === 'addon') {
+                targetClass = 'text-yellow-500';
+                icon = '📂'; // Значок папки
+            }
+
+            html += `
+            <div class="flex p-2 hover:bg-gray-700/30 border-b border-gray-700/30 text-xs">
+                <div class="w-1/2 break-all pr-2 text-gray-400 flex items-center gap-2">
+                   ${f.source}
+                </div>
+                <div class="w-1/2 break-all font-mono ${targetClass}">
+                   <span class="mr-1 opacity-50">${icon}</span> ${f.target}
+                </div>
+            </div>`;
+        });
+
+        mappedContainer.innerHTML = html;
 
         document.getElementById('review-modal').classList.remove('hidden');
     },

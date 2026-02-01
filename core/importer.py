@@ -4,13 +4,12 @@ import zipfile
 import py7zr
 import rarfile
 import time
-import hashlib
 from datetime import datetime
 from pathlib import Path
 from core.database import Mod, ModFile, HofFile, ModType
 from core.analyzer import ModAnalyzer
 
-# Указываем rarfile, где искать UnRAR.exe (если он лежит рядом с main.py)
+# Указываем rarfile, где искать UnRAR.exe
 rarfile.UNRAR_TOOL = "UnRAR.exe"
 
 
@@ -21,48 +20,45 @@ class ModImporter:
         self.logger = logger
 
     def _progress_callback(self, item_name, current, total):
-        """Callback для отправки прогресса в UI"""
         percent = int((current / total) * 100) if total > 0 else 0
         if current % 10 == 0 or current == total:
             self.logger.log(f"{current}/{total}: {item_name}", level="progress", progress=percent)
             time.sleep(0.001)
 
     def _extract_archive(self, archive_path, target_path):
-        """Распаковывает архив и сообщает о прогрессе."""
+        """Распаковывает архив."""
         ext = archive_path.suffix.lower()
 
         if ext == '.zip':
             with zipfile.ZipFile(archive_path, 'r') as zf:
                 members = zf.infolist()
-                total_files = len(members)
                 for i, member in enumerate(members):
                     zf.extract(member, target_path)
-                    self._progress_callback(member.filename, i + 1, total_files)
+                    self._progress_callback(member.filename, i + 1, len(members))
         elif ext == '.7z':
             with py7zr.SevenZipFile(archive_path, mode='r') as z:
                 all_files = z.getnames()
-                total_files = len(all_files)
                 for i, filename in enumerate(all_files):
                     z.extract(targets=[filename], path=target_path)
-                    self._progress_callback(filename, i + 1, total_files)
+                    self._progress_callback(filename, i + 1, len(all_files))
         elif ext == '.rar':
             if not os.path.exists(rarfile.UNRAR_TOOL):
-                raise FileNotFoundError(f"Не найден {rarfile.UNRAR_TOOL}! Поместите его рядом с main.py.")
+                raise FileNotFoundError(f"Не найден {rarfile.UNRAR_TOOL}!")
             with rarfile.RarFile(archive_path) as rf:
                 members = rf.infolist()
-                total_files = sum(1 for m in members if not m.isdir())
-                current_file = 0
+                real_files = [m for m in members if not m.isdir()]
+                count = 0
                 for member in members:
                     if not member.isdir():
                         rf.extract(member, str(target_path))
-                        current_file += 1
-                        self._progress_callback(member.filename, current_file, total_files)
+                        count += 1
+                        self._progress_callback(member.filename, count, len(real_files))
         else:
-            raise Exception(f"Неподдерживаемый формат архива: {ext}")
+            raise Exception(f"Неподдерживаемый формат: {ext}")
 
     def step1_prepare_preview(self, archive_path):
         archive_path = Path(archive_path)
-        self.logger.log(f"Начинаю обработку архива: {archive_path.name}")
+        self.logger.log(f"Начинаю обработку: {archive_path.name}")
 
         mod_folder_name = f"{archive_path.stem}_{int(datetime.now().timestamp())}"
         extract_path = Path(self.config.library_path) / "Mods" / mod_folder_name
@@ -71,7 +67,6 @@ class ModImporter:
             self.logger.log("Создание временной папки...", "info")
             extract_path.mkdir(parents=True, exist_ok=True)
             self._extract_archive(archive_path, extract_path)
-            self.logger.log("Распаковка завершена.", "success")
         except Exception as e:
             if extract_path.exists(): shutil.rmtree(extract_path)
             self.logger.log(f"Ошибка: {e}", "error")
@@ -80,114 +75,94 @@ class ModImporter:
         self.logger.log("Анализ структуры...", "info")
         analyzer = ModAnalyzer(extract_path)
         structure = analyzer.analyze()
-        self.logger.log(f"Определен тип мода: {structure['type'].value}", "success")
-        if not structure['root_path']:
-            self.logger.log(
-                "Внимание: Не удалось автоматически определить 'корень' мода. Файлы могут быть не распределены.",
-                "warning")
 
-        mapped_files, unmapped_files = [], []
+        self.logger.log(f"Тип мода: {structure['type'].value}", "success")
+
+        mapped_files = []
         mod_root = extract_path
         analysis_root = structure['root_path']
+        implicit_buses = structure.get('implicit_buses', [])
 
-        for root, _, files in os.walk(mod_root):
+        # Если корень не найден, считаем корнем саму папку распаковки, но все пойдет в Addons
+        if not analysis_root:
+            analysis_root = mod_root
+
+        for root, dirs, files in os.walk(mod_root):
             for file in files:
                 full_path = Path(root) / file
                 rel_path = full_path.relative_to(mod_root)
 
-                target_path, status = None, "unmapped"
+                target_path = None
+                status = "unmapped"
 
-                if analysis_root:
-                    try:
-                        path_from_root = full_path.relative_to(analysis_root)
+                # Пробуем определить путь относительно найденного "корня игры" внутри мода
+                try:
+                    # Путь файла относительно определенного корня (например Fonts/arial.ttf)
+                    path_from_root = full_path.relative_to(analysis_root)
+
+                    # Первый компонент пути (например 'Fonts' или '1_VOLGABUS')
+                    top_folder = path_from_root.parts[0] if path_from_root.parts else ""
+
+                    # ЛОГИКА РАСПРЕДЕЛЕНИЯ
+
+                    # 1. Если это стандартная папка OMSI (Fonts, Vehicles, Maps...)
+                    if top_folder.lower() in ModAnalyzer.OMSI_ROOT_FOLDERS:
                         target_path = str(path_from_root)
                         status = "mapped"
-                        if structure.get('is_flat_bus'):
-                            target_path = f"Vehicles\\{archive_path.stem}\\{path_from_root}"
-                    except ValueError:
-                        status = "unmapped"
 
-                file_info = {"source": str(rel_path), "target": target_path or "???", "status": status}
-                if status == "mapped":
-                    mapped_files.append(file_info)
-                else:
-                    unmapped_files.append(file_info)
+                    # 2. Если это "Скрытый автобус" (папка с автобусом, лежащая в корне)
+                    elif top_folder in implicit_buses:
+                        # Добавляем Vehicles к пути
+                        target_path = str(Path("Vehicles") / path_from_root)
+                        status = "mapped"
 
-        if len(unmapped_files) > 0:
-            self.logger.log(f"Найдено {len(unmapped_files)} файлов без явного назначения", "warning")
+                    # 3. Особый случай для "Голого автобуса" (когда весь архив - это одна папка автобуса)
+                    elif structure.get('is_flat_bus'):
+                        target_path = str(Path("Vehicles") / archive_path.stem / path_from_root)
+                        status = "mapped"
 
-        # --- ИСПРАВЛЕНИЕ ОШИБКИ JSON ---
-        structure_for_js = structure.copy()
-        structure_for_js['type'] = structure['type'].value
+                    # 4. Все остальное (readme, картинки, левые папки) -> В Addons
+                    else:
+                        # Используем имя мода для папки в Addons
+                        addon_subfolder = archive_path.stem
+                        target_path = str(Path("Addons") / addon_subfolder / path_from_root)
+                        status = "addon"  # Специальный статус, чтобы подсветить в UI
 
-        # Path объект (root_path) нельзя сериализовать в JSON, преобразуем в строку
-        if structure_for_js.get('root_path'):
-            structure_for_js['root_path'] = str(structure_for_js['root_path'])
-        # -------------------------------
+                except ValueError:
+                    # Файл находится "выше" корня (редкий случай, но все же кинем в Addons)
+                    addon_subfolder = archive_path.stem
+                    target_path = str(Path("Addons") / addon_subfolder / rel_path)
+                    status = "addon"
+
+                mapped_files.append({
+                    "source": str(rel_path),
+                    "target": target_path,
+                    "status": status
+                })
+
+        # Подготовка данных для JS (удаляем Path объекты)
+        structure_js = structure.copy()
+        structure_js['type'] = structure['type'].value
+        if structure_js.get('root_path'):
+            structure_js['root_path'] = str(structure_js['root_path'])
+        structure_js['implicit_buses'] = list(structure_js['implicit_buses'])
 
         return {
             "temp_id": str(extract_path),
             "mod_name": archive_path.stem,
             "type": structure['type'].value,
-            "mapped_files": mapped_files,
-            "unmapped_files": unmapped_files,
+            "mapped_files": mapped_files,  # Теперь тут ВСЕ файлы
+            "unmapped_files": [],  # Этот список теперь всегда пуст, т.к. всё уходит в Addons
             "hof_files": structure['hof_files'],
-            "structure_data": structure_for_js
+            "structure_data": structure_js
         }
 
-    def _register_files(self, mod, structure):
-        """Проходит по файлам и записывает их в БД"""
-        mod_root = Path(mod.storage_path)
-        analysis_root = structure.get('root_path')
-        if analysis_root:
-            analysis_root = Path(analysis_root)  # Убедимся, что это Path объект
-
-        for root, _, files in os.walk(mod_root):
-            for file in files:
-                full_path = Path(root) / file
-                source_rel_path = full_path.relative_to(mod_root)
-
-                target_game_path = None
-                if analysis_root:
-                    try:
-                        path_from_analysis_root = full_path.relative_to(analysis_root)
-                        target_game_path = str(path_from_analysis_root)
-
-                        if structure.get('is_flat_bus'):
-                            target_game_path = str(Path('Vehicles') / mod.name / path_from_analysis_root)
-                    except ValueError:
-                        pass
-
-                is_hof = file.lower().endswith('.hof')
-
-                db_file = ModFile(
-                    mod_id=mod.id,
-                    source_rel_path=str(source_rel_path),
-                    target_game_path=target_game_path,
-                    is_hof=is_hof,
-                    file_hash="pending"
-                )
-                self.session.add(db_file)
-
-                if is_hof and target_game_path:
-                    hof_entry = HofFile(
-                        mod_id=mod.id,
-                        filename=file,
-                        full_source_path=str(full_path),
-                        description="Автоматически найден"
-                    )
-                    self.session.add(hof_entry)
-
     def step2_confirm_import(self, preview_data):
+        """Сохраняет мод в БД."""
         extract_path = Path(preview_data['temp_id'])
         mod_name = preview_data['mod_name']
-        structure = preview_data['structure_data']
 
-        # Конвертируем обратно из строки в Path-объект, если он есть (т.к. мы превратили его в строку в step1)
-        if structure.get('root_path'):
-            structure['root_path'] = Path(structure['root_path'])
-
-        self.logger.log("Сохранение в базу данных...", "info")
+        self.logger.log("Регистрация мода в базе...", "info")
 
         new_mod = Mod(
             name=mod_name,
@@ -196,16 +171,43 @@ class ModImporter:
             is_enabled=False
         )
         self.session.add(new_mod)
-        self.session.flush()
+        self.session.flush()  # Получаем ID
 
-        self._register_files(new_mod, structure)
+        # Берем маппинг прямо из preview_data, который прислал фронтенд (или пересчитываем)
+        # Надежнее взять то, что мы сгенерировали в step1, но переданное обратно
+        # В данном коде мы просто пройдемся по mapped_files из JSON
+
+        count = 0
+        for file_info in preview_data['mapped_files']:
+            is_hof = file_info['source'].lower().endswith('.hof')
+
+            db_file = ModFile(
+                mod_id=new_mod.id,
+                source_rel_path=file_info['source'],
+                target_game_path=file_info['target'],  # Путь уже с Addons или Vehicles
+                is_hof=is_hof,
+                file_hash="pending"
+            )
+            self.session.add(db_file)
+
+            if is_hof:
+                # Определяем полный путь для HOF
+                full_source = extract_path / file_info['source']
+                hof_entry = HofFile(
+                    mod_id=new_mod.id,
+                    filename=os.path.basename(file_info['source']),
+                    full_source_path=str(full_source),
+                    description="Найден при установке"
+                )
+                self.session.add(hof_entry)
+            count += 1
 
         self.session.commit()
-        self.logger.log(f"Мод '{mod_name}' успешно добавлен в библиотеку!", "success")
+        self.logger.log(f"Мод сохранен! Файлов: {count}", "success")
         return True
 
     def cancel_import(self, temp_path):
         path = Path(temp_path)
         if path.exists():
             shutil.rmtree(path)
-            self.logger.log("Импорт отменен. Временные файлы удалены.", "info")
+            self.logger.log("Отмена. Временные файлы удалены.", "info")
