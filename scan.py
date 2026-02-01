@@ -46,11 +46,11 @@ def print_smart_tree(path_to_scan, depth=0, max_depth=3):
 # 1. Проверь на папке с игрой
 # target_omsi = r'D:\Games\OMSI 2 Steam Edition'
 # if os.path.exists(target_omsi):
-#     print("СТРУКТУРА ИГРЫ:")
-#     print_smart_tree(target_omsi)
+#  print("СТРУКТУРА ИГРЫ:")
+#  print_smart_tree(target_omsi)
 
 # 2. Проверь на папке с модом (распакованным)
-target_mod = r'D:\omsitemp\3mod'
+target_mod = r'D:\omsitemp\2mod'
 if os.path.exists(target_mod):
     print("\nСТРУКТУРА МОДА:")
     print_smart_tree(target_mod)

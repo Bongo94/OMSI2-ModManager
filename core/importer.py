@@ -11,7 +11,6 @@ from core.database import Mod, ModFile, HofFile, ModType
 from core.analyzer import ModAnalyzer
 
 # Указываем rarfile, где искать UnRAR.exe (если он лежит рядом с main.py)
-# Если вы положили его в другое место, укажите полный путь
 rarfile.UNRAR_TOOL = "UnRAR.exe"
 
 
@@ -24,7 +23,6 @@ class ModImporter:
     def _progress_callback(self, item_name, current, total):
         """Callback для отправки прогресса в UI"""
         percent = int((current / total) * 100) if total > 0 else 0
-        # Обновляем JS не слишком часто, чтобы не тормозить
         if current % 10 == 0 or current == total:
             self.logger.log(f"{current}/{total}: {item_name}", level="progress", progress=percent)
             time.sleep(0.001)
@@ -42,7 +40,6 @@ class ModImporter:
                     self._progress_callback(member.filename, i + 1, total_files)
         elif ext == '.7z':
             with py7zr.SevenZipFile(archive_path, mode='r') as z:
-                # Callback для 7zip не очень удобен, эмулируем прогресс по файлам
                 all_files = z.getnames()
                 total_files = len(all_files)
                 for i, filename in enumerate(all_files):
@@ -119,9 +116,14 @@ class ModImporter:
         if len(unmapped_files) > 0:
             self.logger.log(f"Найдено {len(unmapped_files)} файлов без явного назначения", "warning")
 
-        # КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Конвертируем Enum в строку перед отправкой в JS
+        # --- ИСПРАВЛЕНИЕ ОШИБКИ JSON ---
         structure_for_js = structure.copy()
         structure_for_js['type'] = structure['type'].value
+
+        # Path объект (root_path) нельзя сериализовать в JSON, преобразуем в строку
+        if structure_for_js.get('root_path'):
+            structure_for_js['root_path'] = str(structure_for_js['root_path'])
+        # -------------------------------
 
         return {
             "temp_id": str(extract_path),
@@ -129,8 +131,8 @@ class ModImporter:
             "type": structure['type'].value,
             "mapped_files": mapped_files,
             "unmapped_files": unmapped_files,
-            "hof_files": structure['hof_files'],  # Уже строки
-            "structure_data": structure_for_js  # Отправляем безопасную для JSON версию
+            "hof_files": structure['hof_files'],
+            "structure_data": structure_for_js
         }
 
     def _register_files(self, mod, structure):
@@ -154,7 +156,7 @@ class ModImporter:
                         if structure.get('is_flat_bus'):
                             target_game_path = str(Path('Vehicles') / mod.name / path_from_analysis_root)
                     except ValueError:
-                        pass  # Файл вне корня, target_game_path остается None
+                        pass
 
                 is_hof = file.lower().endswith('.hof')
 
@@ -167,7 +169,7 @@ class ModImporter:
                 )
                 self.session.add(db_file)
 
-                if is_hof and target_game_path:  # HOFы, которые будут установлены
+                if is_hof and target_game_path:
                     hof_entry = HofFile(
                         mod_id=mod.id,
                         filename=file,
@@ -180,7 +182,8 @@ class ModImporter:
         extract_path = Path(preview_data['temp_id'])
         mod_name = preview_data['mod_name']
         structure = preview_data['structure_data']
-        # Конвертируем обратно из строки в Path-объект, если он есть
+
+        # Конвертируем обратно из строки в Path-объект, если он есть (т.к. мы превратили его в строку в step1)
         if structure.get('root_path'):
             structure['root_path'] = Path(structure['root_path'])
 
