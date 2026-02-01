@@ -1,0 +1,35 @@
+/* Общие стили кнопок, чтобы не мусорить в HTML */
+.btn-primary {
+    @apply px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded transition shadow font-medium active:transform active:scale-95;
+}
+
+.btn-secondary {
+    @apply px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition border border-gray-600 active:transform active:scale-95;
+}
+
+/* Красивый скроллбар (как в VS Code) */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #1f2937; /* gray-800 */
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #4b5563; /* gray-600 */
+    border-radius: 5px;
+    border: 2px solid #1f2937;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #6b7280; /* gray-500 */
+}
+
+/* Анимации */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+tr.new-row {
+    animation: fadeIn 0.3s ease-out;
+}

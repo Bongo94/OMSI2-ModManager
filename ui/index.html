@@ -4,188 +4,160 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OMSI 2 Mod Manager</title>
-    <!-- Tailwind CSS для красоты -->
+    <!-- Tailwind CSS (CDN для прототипа, в релизе лучше скачать) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body {
-            background-color: #1e1e1e;
-            color: #e0e0e0;
-            font-family: sans-serif;
-        }
-
-        .btn {
-            @apply px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-white transition;
-        }
-
-        .input {
-            @apply w-full p-2 bg-gray-700 rounded border border-gray-600 text-white;
-        }
-    </style>
+    <!-- Наши стили -->
+    <link rel="stylesheet" href="static/css/style.css">
 </head>
-<body class="h-screen flex flex-col">
+<body class="h-screen flex flex-col bg-gray-900 text-gray-200 font-sans select-none">
 
-<!-- HEADER -->
-<header class="bg-gray-800 p-4 shadow-md flex justify-between items-center">
-    <h1 class="text-xl font-bold text-blue-400">OMSI 2 Manager</h1>
-    <div id="status" class="text-sm text-gray-400">Загрузка...</div>
-</header>
+    <!-- HEADER -->
+    <header class="bg-gray-800 p-3 shadow-md border-b border-gray-700 flex justify-between items-center z-10">
+        <div class="flex items-center gap-2">
+            <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+            <h1 class="font-bold text-lg text-blue-100 tracking-wide">OMSI 2 <span class="text-blue-500">Manager</span></h1>
+        </div>
+        <div id="status-bar" class="text-xs text-gray-500 font-mono">Connecting...</div>
+    </header>
 
-<!-- CONTENT -->
-<main class="flex-1 p-6 overflow-auto">
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 flex flex-col overflow-hidden relative">
 
-    <!-- Блок первоначальной настройки -->
-    <div id="setup-screen" class="max-w-xl mx-auto bg-gray-800 p-6 rounded-lg shadow-lg hidden">
-        <h2 class="text-lg font-bold mb-4">Настройка путей</h2>
+        <!-- 1. SETUP SCREEN (Экран первой настройки) -->
+        <div id="setup-screen" class="hidden m-auto w-full max-w-lg">
+            <div class="bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-700">
+                <h2 class="text-2xl font-bold mb-6 text-white text-center">Добро пожаловать</h2>
 
-        <div class="mb-4">
-            <label class="block text-sm mb-1">Путь к папке OMSI 2:</label>
-            <div class="flex gap-2">
-                <input type="text" id="game-path-input" class="input" placeholder="C:\Games\OMSI 2">
-                <button onclick="selectGameFolder()" class="btn">...</button>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Папка с игрой OMSI 2</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="game-path-input" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-sm text-white" readonly placeholder="Выберите папку...">
+                            <button id="btn-browse-game" class="btn-secondary">...</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Библиотека модов (Где хранить архивы)</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="lib-path-input" class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-sm text-white" readonly placeholder="Выберите папку...">
+                            <button id="btn-browse-lib" class="btn-secondary">...</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="btn-save-settings" class="w-full mt-8 btn-primary py-3 font-bold text-lg">Начать работу</button>
             </div>
         </div>
 
-        <div class="mb-4">
-            <label class="block text-sm mb-1">Где хранить моды (Mod Library):</label>
-            <div class="flex gap-2">
-                <input type="text" id="lib-path-input" class="input" placeholder="D:\OMSI_Mods">
-                <button onclick="selectLibFolder()" class="btn">...</button>
+        <!-- 2. DASHBOARD (Основной экран) -->
+        <div id="main-screen" class="hidden flex-1 flex flex-col p-4">
+            <!-- Toolbar -->
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-100">Установленные моды</h2>
+                <div class="flex gap-3">
+                    <button id="btn-refresh" class="btn-secondary text-sm">↻ Обновить</button>
+                    <button id="btn-add-mod" class="btn-primary text-sm shadow-lg shadow-blue-900/50">+ Добавить мод</button>
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="flex-1 overflow-auto bg-gray-800 rounded-lg border border-gray-700 custom-scrollbar">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-gray-900 text-gray-400 sticky top-0 z-0 shadow-sm">
+                        <tr>
+                            <th class="p-4 font-medium w-1/3">Название</th>
+                            <th class="p-4 font-medium">Тип</th>
+                            <th class="p-4 font-medium">Дата установки</th>
+                            <th class="p-4 font-medium">Статус</th>
+                            <th class="p-4 font-medium text-right">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mod-table-body" class="divide-y divide-gray-700 text-gray-300">
+                        <!-- JS заполнит это -->
+                    </tbody>
+                </table>
+
+                <!-- Заглушка, если пусто -->
+                <div id="empty-state" class="hidden h-full flex flex-col items-center justify-center text-gray-500 opacity-50">
+                    <svg class="w-16 h-16 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2 2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                    <p>Библиотека пуста</p>
+                </div>
             </div>
         </div>
 
-        <button onclick="saveSettings()" class="w-full btn bg-green-600 hover:bg-green-500">Сохранить и начать</button>
+        <!-- 3. LOG CONSOLE (Всегда внизу) -->
+        <div class="h-40 bg-black border-t border-gray-700 flex flex-col">
+            <div class="px-2 py-1 bg-gray-800 text-xs text-gray-400 border-b border-gray-700 flex justify-between">
+                <span>SYSTEM LOG</span>
+                <button onclick="document.getElementById('log-container').innerHTML=''" class="hover:text-white">Clear</button>
+            </div>
+            <div id="log-container" class="flex-1 overflow-y-auto p-2 font-mono text-xs space-y-1 custom-scrollbar">
+                <!-- Логи из Python -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODALS -->
+
+    <!-- Review Modal -->
+    <div id="review-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center transition-opacity">
+        <div class="bg-gray-800 w-[90%] h-[85%] flex flex-col rounded-xl shadow-2xl border border-gray-600 overflow-hidden">
+            <!-- Header -->
+            <div class="p-5 border-b border-gray-700 bg-gray-900 flex justify-between items-center">
+                <div>
+                    <h3 class="text-xl font-bold text-white">Установка: <span id="review-mod-name" class="text-blue-400">...</span></h3>
+                    <p class="text-xs text-gray-400 mt-1">Проверьте файлы перед установкой</p>
+                </div>
+                <div id="review-mod-type" class="px-3 py-1 bg-blue-900 text-blue-200 rounded text-xs font-bold uppercase tracking-wider">UNKNOWN</div>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-hidden flex flex-col md:flex-row">
+                <!-- Левая колонка: Мусор/Неизвестное -->
+                <div id="unmapped-panel" class="hidden md:w-1/3 w-full border-r border-gray-700 flex flex-col bg-red-900/10">
+                    <div class="p-3 bg-red-900/20 text-red-300 font-bold text-sm flex items-center gap-2 border-b border-red-900/30">
+                        <span>⚠️ Пропущенные файлы</span>
+                    </div>
+                    <div id="unmapped-list" class="flex-1 overflow-auto p-3 text-xs text-red-200/70 space-y-1 custom-scrollbar"></div>
+                </div>
+
+                <!-- Правая колонка: Файлы для установки -->
+                <div class="flex-1 flex flex-col bg-gray-800">
+                    <div class="p-3 bg-green-900/20 text-green-300 font-bold text-sm border-b border-green-900/30">
+                        <span>✅ Файлы для установки (Симлинки)</span>
+                    </div>
+                    <div id="mapped-list" class="flex-1 overflow-auto p-0 text-xs custom-scrollbar">
+                        <!-- Table header -->
+                        <div class="flex bg-gray-900/50 p-2 text-gray-500 border-b border-gray-700">
+                            <div class="w-1/2">Исходный файл (в моде)</div>
+                            <div class="w-1/2">Путь в игре</div>
+                        </div>
+                        <div id="mapped-rows" class="divide-y divide-gray-700/50"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="p-4 border-t border-gray-700 bg-gray-900 flex justify-end gap-3">
+                <button id="btn-cancel-import" class="btn-secondary bg-red-900/20 border-red-900/50 hover:bg-red-900/40 text-red-200">Отмена</button>
+                <button id="btn-confirm-import" class="btn-primary bg-green-700 hover:bg-green-600">Подтвердить установку</button>
+            </div>
+        </div>
     </div>
 
-    <!-- Основной экран -->
-    <div id="main-screen" class="hidden h-full flex flex-col">
-        <!-- Тулбар -->
-        <div class="flex justify-between items-center mb-4 bg-gray-700 p-3 rounded">
-            <h2 class="text-xl font-bold">Библиотека модов</h2>
-            <div class="flex gap-2">
-                <button onclick="refreshModList()" class="btn bg-gray-600 text-sm">Обновить</button>
-                <button onclick="importMod()" class="btn bg-blue-600 text-sm font-bold">+ Добавить мод</button>
-            </div>
-        </div>
-
-        <!-- Таблица -->
-        <div class="flex-1 overflow-auto bg-gray-800 rounded shadow">
-            <table class="w-full text-left border-collapse">
-                <thead class="bg-gray-900 text-gray-400 sticky top-0">
-                <tr>
-                    <th class="p-3">Название</th>
-                    <th class="p-3">Тип</th>
-                    <th class="p-3">Дата</th>
-                    <th class="p-3">Статус</th>
-                    <th class="p-3">Действия</th>
-                </tr>
-                </thead>
-                <tbody id="mod-table-body" class="divide-y divide-gray-700 text-sm">
-                <!-- Сюда JS вставит строки -->
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Индикатор загрузки (модальное окно) -->
-        <div id="loading-modal"
-             class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
-            <div class="bg-gray-800 p-8 rounded shadow-xl text-center">
-                <div class="text-2xl mb-4 animate-spin">⚙️</div>
-                <h3 class="text-xl font-bold">Идет обработка мода...</h3>
-                <p class="text-gray-400">Распаковка и анализ, подождите.</p>
-            </div>
+    <!-- Loading Overlay -->
+    <div id="loading-modal" class="hidden fixed inset-0 bg-black/90 z-[60] flex items-center justify-center">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <h3 class="text-xl font-bold text-blue-400">Обработка...</h3>
+            <p class="text-sm text-gray-500 mt-2">Смотрите подробности в консоли</p>
         </div>
     </div>
 
-</main>
-
-<script>
-    // Функция вызывается при старте
-    window.addEventListener('pywebviewready', function () {
-        checkStatus();
-    });
-
-    async function checkStatus() {
-        // Спрашиваем у Python состояние
-        const config = await pywebview.api.get_config();
-
-        if (config.game_path && config.library_path) {
-            document.getElementById('main-screen').classList.remove('hidden');
-            document.getElementById('status').innerText = `OMSI: ${config.game_path}`;
-        } else {
-            document.getElementById('setup-screen').classList.remove('hidden');
-            document.getElementById('status').innerText = 'Требуется настройка';
-        }
-    }
-
-    async function selectGameFolder() {
-        // Вызов диалога выбора папки
-        const path = await pywebview.api.browse_folder();
-        if (path) document.getElementById('game-path-input').value = path;
-    }
-
-    async function selectLibFolder() {
-        const path = await pywebview.api.browse_folder();
-        if (path) document.getElementById('lib-path-input').value = path;
-    }
-
-    async function saveSettings() {
-        const gamePath = document.getElementById('game-path-input').value;
-        const libPath = document.getElementById('lib-path-input').value;
-
-        const resGame = await pywebview.api.set_game_path(gamePath);
-        const resLib = await pywebview.api.set_library_path(libPath);
-
-        if (resGame[0] && resLib[0]) {
-            location.reload(); // Перезагружаем интерфейс
-        } else {
-            alert(`Ошибка: ${resGame[1] || resLib[1]}`);
-        }
-    }
-
-    async function importMod() {
-        // Показываем спиннер
-        document.getElementById('loading-modal').classList.remove('hidden');
-
-        // Вызываем Python (ждем завершения)
-        const result = await pywebview.api.import_mod();
-
-        // Скрываем спиннер
-        document.getElementById('loading-modal').classList.add('hidden');
-
-        if (result) {
-            if (result.success) {
-                alert(result.message);
-                refreshModList(); // Обновляем таблицу
-            } else {
-                alert("Ошибка: " + result.message);
-            }
-        }
-    }
-
-    async function refreshModList() {
-        const mods = await pywebview.api.get_mods_list();
-        const tbody = document.getElementById('mod-table-body');
-        tbody.innerHTML = '';
-
-        mods.forEach(mod => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                    <td class="p-3 font-medium text-white">${mod.name}</td>
-                    <td class="p-3"><span class="px-2 py-1 rounded bg-gray-600 text-xs">${mod.type}</span></td>
-                    <td class="p-3 text-gray-400">${mod.date}</td>
-                    <td class="p-3">
-                        <span class="${mod.is_enabled ? 'text-green-400' : 'text-red-400'}">
-                            ${mod.is_enabled ? 'Включен' : 'Отключен'}
-                        </span>
-                    </td>
-                    <td class="p-3">
-                        <button class="text-blue-400 hover:text-blue-300 mr-2">Вкл/Выкл</button>
-                        <button class="text-red-400 hover:text-red-300">Удалить</button>
-                    </td>
-                `;
-            tbody.appendChild(tr);
-        });
-    }
-</script>
+    <!-- Scripts -->
+    <script src="static/js/view.js"></script>
+    <script src="static/js/app.js"></script>
 </body>
 </html>

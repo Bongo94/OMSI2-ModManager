@@ -33,6 +33,32 @@ class Api:
             "library_path": self.config_manager.library_path
         }
 
+    def import_mod_step1(self):
+        """ШАГ 1: Выбор файла и Анализ"""
+        file_types = ('Archives (*.zip;*.7z;*.rar)', 'All files (*.*)')
+        result = self.window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=False, file_types=file_types)
+
+        if result:
+            filepath = result[0]
+            # Создаем импортер с логгером
+            importer = ModImporter(self.config_manager, self.logger)
+
+            # Запускаем анализ
+            preview_data = importer.step1_prepare_preview(filepath)
+            return preview_data
+        return None
+
+    def import_mod_step2(self, preview_data):
+        """ШАГ 2: Подтверждение"""
+        importer = ModImporter(self.config_manager, self.logger)
+        success = importer.step2_confirm_import(preview_data)
+        return success
+
+    def cancel_import(self, temp_path):
+        """Отмена"""
+        importer = ModImporter(self.config_manager, self.logger)
+        importer.cancel_import(temp_path)
+
     def browse_folder(self):
         """Открывает нативное окно выбора папки"""
         folder = webview.windows[0].create_file_dialog(webview.FOLDER_DIALOG)
@@ -77,7 +103,7 @@ class Api:
             result.append({
                 "id": m.id,
                 "name": m.name,
-                "type": m.mod_type.value,  # enum to string
+                "type": m.mod_type.value,  # enum toё string
                 "is_enabled": m.is_enabled,
                 "date": m.install_date.strftime("%Y-%m-%d %H:%M")
             })
@@ -91,19 +117,18 @@ class Api:
 if __name__ == '__main__':
     api = Api()
 
-    # Получаем абсолютный путь к UI
     current_dir = os.path.dirname(os.path.abspath(__file__))
+    # ОБРАТИ ВНИМАНИЕ НА ПУТЬ:
     ui_path = os.path.join(current_dir, 'ui', 'index.html')
 
     window = webview.create_window(
         'OMSI 2 Mod Manager',
         url=f'file://{ui_path}',
-        width=1000,
-        height=700,
+        width=1100,  # Сделал пошире
+        height=800,
         js_api=api,
-        resizable=True
+        min_size=(900, 600),
+        background_color='#111827'  # Цвет фона (серый темный) чтобы не мелькало белым
     )
-    api.set_window(window)  # Передаем окно в API
+    api.set_window(window)
     webview.start(debug=True)
-
-    webview.start(debug=True)  # debug=True включает консоль разработчика (F12)
