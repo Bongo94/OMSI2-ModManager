@@ -3,7 +3,7 @@ import shutil
 import hashlib
 from pathlib import Path
 from sqlalchemy import func
-from core.database import Mod, ModFile, InstalledFile
+from core.database import Mod, ModFile, InstalledFile, HofFile
 
 
 class ModInstaller:
@@ -39,6 +39,68 @@ class ModInstaller:
 
         self.session.commit()
         return self.sync_state()
+
+    def delete_mod_permanently(self, mod_id):
+        """
+        Полное удаление мода:
+        1. Выключение (удаление из игры).
+        2. Удаление файлов из библиотеки.
+        3. Удаление из БД.
+        """
+        mod = self.session.query(Mod).get(mod_id)
+        if not mod:
+            return False, "Мод не найден в БД"
+
+        mod_name = mod.name
+        storage_path = Path(mod.storage_path)
+
+        self.logger.log(f"Удаление мода: {mod_name}...", "info")
+
+        # ШАГ 1: Убираем файлы из игры (если мод был включен)
+        if mod.is_enabled:
+            self.logger.log("Отключение мода перед удалением...", "info")
+            mod.is_enabled = False
+            self.session.commit()
+
+            success, msg = self.sync_state()
+            if not success:
+                return False, f"Ошибка при отключении файлов: {msg}"
+
+        # ШАГ 2: Удаляем HOF файлы, связанные с модом (из HOF_Storage)
+        # Они могут лежать вне папки storage_path, поэтому удаляем отдельно
+        hofs = self.session.query(HofFile).filter_by(mod_id=mod.id).all()
+        for hof in hofs:
+            try:
+                hof_path = Path(hof.full_source_path)
+                # Удаляем только если файл существует и находится внутри библиотеки (защита от удаления лишнего)
+                if hof_path.exists() and self.config.library_path in str(hof_path):
+                    os.remove(hof_path)
+            except Exception as e:
+                self.logger.log(f"Не удалось удалить HOF {hof.filename}: {e}", "warning")
+
+        # ШАГ 3: Физическое удаление папки мода из библиотеки
+        try:
+            if storage_path.exists():
+                # shutil.rmtree часто падает на Windows из-за read-only файлов, поэтому используем костыль
+                def on_rm_error(func, path, exc_info):
+                    os.chmod(path, 0o777)
+                    func(path)
+
+                shutil.rmtree(storage_path, onerror=on_rm_error)
+                self.logger.log(f"Папка {storage_path.name} удалена с диска.", "info")
+            else:
+                self.logger.log("Папка мода уже отсутствует на диске.", "warning")
+        except Exception as e:
+            return False, f"Ошибка удаления файлов с диска: {e}"
+
+        # ШАГ 4: Удаление записи из БД
+        try:
+            self.session.delete(mod)
+            self.session.commit()
+        except Exception as e:
+            return False, f"Ошибка БД: {e}"
+
+        return True, f"Мод '{mod_name}' успешно удален."
 
     def sync_state(self):
         """
@@ -198,6 +260,11 @@ class ModInstaller:
                 backup_path = str(backup_full_path)
 
         try:
+            # os.symlink требует прав администратора на старых Windows.
+            # Если падает, пробуем копирование (это хуже для места, но работает)
+            if not source_full_path.exists():
+                raise FileNotFoundError(f"Source missing: {source_full_path}")
+
             os.symlink(str(source_full_path), str(target_path))
         except OSError:
             shutil.copy2(str(source_full_path), str(target_path))

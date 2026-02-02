@@ -13,10 +13,19 @@ class ModAnalyzer:
 
     # Папки, которые точно относятся к корню игры
     OMSI_ROOT_FOLDERS = {
+        # Основные ресурсы
         'vehicles', 'maps', 'sceneryobjects', 'splines',
-        'fonts', 'texture', 'sound', 'inputs', 'gui',
-        'drivers', 'ticketpacks', 'money', 'trains',
-        'humans', 'addons'
+        'fonts', 'texture', 'tex_hq', 'sound', 'inputs', 'gui',
+
+        # Люди и трафик
+        'drivers', 'ticketpacks', 'money', 'trains', 'humans',
+
+        # Системные и плагины (из вашего скриншота)
+        'option_presets', 'plugins', 'helper', 'languages',
+        'regaddons', 'demimport', 'template', 'tutorials',
+
+        # Стандартные
+        'addons', '_commonredist', '_activation'
     }
 
     def __init__(self, mod_path):

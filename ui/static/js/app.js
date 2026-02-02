@@ -349,3 +349,22 @@ document.getElementById('btn-confirm-hof-import').onclick = async () => {
     const data = await pywebview.api.get_hof_data();
     renderHofManager(data);
 };
+
+window.deleteMod = async (modId) => {
+    if (!confirm("ВНИМАНИЕ! Вы собираетесь полностью удалить этот мод.\n\nЭто действие:\n1. Уберет файлы мода из игры.\n2. Удалит архив и файлы из Библиотеки.\n\nПродолжить?")) return;
+
+    View.setLoading(true, "Удаление мода (это может занять время)...");
+
+    // Вызов нового метода API
+    const result = await pywebview.api.delete_mod(modId);
+
+    View.setLoading(false);
+
+    if (result.status === 'success') {
+        View.addLog(result.message, 'success');
+        loadMods(); // Перезагружаем таблицу, чтобы строка исчезла
+    } else {
+        alert("Ошибка при удалении: " + result.message);
+        View.addLog("Ошибка удаления: " + result.message, 'error');
+    }
+};
