@@ -2,7 +2,7 @@ import json
 import os
 import webview
 from core.config import ConfigManager
-from core.database import Mod
+from core.database import Mod, GameProfile
 from core.hof_tools import HofTools
 from core.importer import ModImporter
 from core.installer import ModInstaller
