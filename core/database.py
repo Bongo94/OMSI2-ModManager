@@ -5,7 +5,6 @@ import enum
 
 Base = declarative_base()
 
-
 # --- ПЕРЕЧИСЛЕНИЯ (ENUMS) ---
 
 class ModType(enum.Enum):
@@ -20,6 +19,18 @@ class ModType(enum.Enum):
 
 
 # --- МОДЕЛИ ---
+
+class GameProfile(Base):
+    """
+    Хранит состояние модов (включен/выключен/приоритет) для конкретной папки игры.
+    """
+    __tablename__ = 'game_profiles'
+
+    # Путь к папке игры выступает уникальным ключом
+    game_path = Column(String, primary_key=True)
+
+    # JSON строка вида { "mod_id": {"enabled": true, "prio": 5}, ... }
+    mods_state_json = Column(Text, default="{}")
 
 class Mod(Base):
     """Установленный мод (архив, распакованный в библиотеку)"""
@@ -110,16 +121,14 @@ class InstalledFile(Base):
     id = Column(Integer, primary_key=True)
 
     # Относительный путь в игре (Vehicles/Man/sound.cfg)
-    game_path = Column(String, unique=True, nullable=False)
+    game_path = Column(String, nullable=False)
 
-    # ID мода, чей файл сейчас установлен (победитель в конфликте)
+    # НОВОЕ ПОЛЕ: Корневая папка игры, к которой относится этот файл
+    # Нужно, чтобы отличать установку в Game_v1 от Game_v2
+    root_path = Column(String, nullable=False, default="")
+
     active_mod_id = Column(Integer, ForeignKey('mods.id'))
-
-    # Если мы заменили ОРИГИНАЛЬНЫЙ файл игры, здесь лежит путь к нашему бэкапу
-    # (Например: X:/OMSI Library/Backups/sound.cfg_original_hash123)
     backup_path = Column(String, nullable=True)
-
-    # Хеш оригинального файла (для проверки целостности при восстановлении)
     original_hash = Column(String, nullable=True)
 
 
@@ -134,22 +143,25 @@ class AppSetting(Base):
 
 def init_db(db_path='manager.db'):
     engine = create_engine(f'sqlite:///{db_path}', echo=False)
-
-    # 1. Сначала создаем таблицы, если их нет (стандартный метод)
     Base.metadata.create_all(engine)
 
-    # 2. Проверяем, нужна ли миграция (добавление колонки priority)
     inspector = inspect(engine)
-    columns = [c['name'] for c in inspector.get_columns('mods')]
 
-    if 'priority' not in columns:
-        print("Migrating database: adding 'priority' column to 'mods' table...")
+    # Миграция для priority (старая)
+    cols_mods = [c['name'] for c in inspector.get_columns('mods')]
+    if 'priority' not in cols_mods:
         with engine.connect() as conn:
-            # SQLite позволяет добавлять колонки простой командой ALTER TABLE
             conn.execute(text("ALTER TABLE mods ADD COLUMN priority INTEGER DEFAULT 0"))
             conn.commit()
-            print("Migration successful!")
 
-    # 3. Создаем сессию
+    # НОВАЯ МИГРАЦИЯ: Добавляем root_path в game_file_state
+    cols_inst = [c['name'] for c in inspector.get_columns('game_file_state')]
+    if 'root_path' not in cols_inst:
+        print("Migrating: adding 'root_path' to 'game_file_state'...")
+        with engine.connect() as conn:
+            # Добавляем колонку. По умолчанию пустая строка (для старых записей это не критично, они просто станут "сиротами")
+            conn.execute(text("ALTER TABLE game_file_state ADD COLUMN root_path VARCHAR DEFAULT ''"))
+            conn.commit()
+
     Session = sessionmaker(bind=engine)
     return Session()

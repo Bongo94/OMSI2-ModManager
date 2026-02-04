@@ -15,7 +15,8 @@ window.addEventListener('pywebviewready', async function () {
         const config = await pywebview.api.get_config();
 
         if (config.game_path && config.library_path) {
-            document.getElementById('status-bar').innerText = `Game: ${config.game_path}`;
+            document.getElementById('status-bar').innerText = config.game_path; // Показываем путь
+            document.getElementById('status-bar').title = config.game_path;
             View.showMain();
             loadMods();
         } else {
@@ -27,6 +28,28 @@ window.addEventListener('pywebviewready', async function () {
         View.addLog("Ошибка соединения с API: " + e, "error");
     }
 });
+
+// НОВАЯ ФУНКЦИЯ ДЛЯ КНОПКИ
+document.getElementById('btn-change-game').onclick = async () => {
+    // Блокируем интерфейс
+    View.setLoading(true, "Смена профиля игры...");
+
+    const res = await pywebview.api.switch_game_folder();
+
+    View.setLoading(false);
+
+    if (res.status === 'success') {
+        // Обновляем UI
+        document.getElementById('status-bar').innerText = res.new_path;
+        document.getElementById('status-bar').title = res.new_path;
+        View.addLog(res.message, "success");
+
+        // Перезагружаем таблицу модов (они уже имеют новые статусы is_enabled из базы)
+        loadMods();
+    } else if (res.status === 'error') {
+        alert(res.message);
+    }
+};
 
 // --- EVENT LISTENERS ---
 

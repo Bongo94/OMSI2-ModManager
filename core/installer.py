@@ -109,13 +109,15 @@ class ModInstaller:
         """
         self.logger.log("Сбор данных...", "progress", 0)
 
-        # 1. Загружаем ВСЕ данные в память одним махом
-        # Активные моды
+        # Получаем текущий корень игры (строкой)
+        current_root = str(self.game_root)
+
+        # 1. Загружаем активные моды
         active_mods = self.session.query(Mod).filter_by(is_enabled=True).order_by(Mod.priority).all()
 
-        # Текущее состояние файлов в игре (что мы уже установили)
-        # Превращаем в словарь: { "Vehicles/Bus/file.cfg": InstalledFileObject }
-        tracked_files_query = self.session.query(InstalledFile).all()
+        # 2. ИЗМЕНЕНИЕ: Загружаем установленные файлы ТОЛЬКО для текущей папки игры
+        tracked_files_query = self.session.query(InstalledFile).filter_by(root_path=current_root).all()
+
         current_installed_map = {rec.game_path.replace("\\", "/").lower(): rec for rec in tracked_files_query}
 
         # 2. Рассчитываем "Желаемое состояние" в памяти
@@ -187,22 +189,13 @@ class ModInstaller:
         # ШАГ 4.2: Массовая установка
         for game_path_lower, source, mod_id in to_install:
             try:
-                # game_path_lower у нас в нижнем регистре, но для симлинка лучше брать
-                # "красивый" путь. Возьмем его из source имени или оставим как есть.
-                # Для надежности можно хранить оригинальный case, но пока так:
-
-                # Для создания InstalledFile нам нужен относительный путь
-                # А source - это Path объект
-
-                # Восстанавливаем "нормальный" путь для ОС из ключа (slashes fix)
-                target_rel_path = game_path_lower  # Можно попытаться восстановить регистр, но для Windows не критично
-
-                # Установка физически
+                target_rel_path = game_path_lower
                 backup, orig_hash = self._install_file_physically(target_rel_path, source)
 
-                # Готовим запись для БД (но не добавляем пока, чтобы быстрее)
+                # ИЗМЕНЕНИЕ: При создании записи указываем root_path
                 new_db_records.append(InstalledFile(
                     game_path=target_rel_path,
+                    root_path=current_root,
                     active_mod_id=mod_id,
                     backup_path=backup,
                     original_hash=orig_hash

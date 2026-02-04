@@ -176,6 +176,93 @@ class Api:
         success, msg = tools.install_hofs_to_buses(hof_ids, bus_names)
         return {"status": "success" if success else "warning", "message": msg}
 
+    def _save_current_profile(self):
+        """Сохраняет текущее состояние модов в профиль текущей папки"""
+        current_path = self.config_manager.game_path
+        if not current_path: return
+
+        session = self.config_manager.session
+        mods = session.query(Mod).all()
+
+        # Собираем словарь {id: {enabled, prio}}
+        state_data = {}
+        for m in mods:
+            if m.is_enabled or m.priority > 0:
+                state_data[m.id] = {
+                    "e": m.is_enabled,
+                    "p": m.priority
+                }
+
+        json_str = json.dumps(state_data)
+
+        # Записываем в БД
+        profile = session.query(GameProfile).get(current_path)
+        if not profile:
+            profile = GameProfile(game_path=current_path)
+            session.add(profile)
+
+        profile.mods_state_json = json_str
+        session.commit()
+
+    def _load_profile(self, new_path):
+        """Загружает состояние модов для новой папки"""
+        session = self.config_manager.session
+        profile = session.query(GameProfile).get(new_path)
+
+        mods = session.query(Mod).all()
+
+        if not profile:
+            # Если профиля нет (новая папка), выключаем все моды
+            for m in mods:
+                m.is_enabled = False
+                m.priority = 0
+        else:
+            # Если профиль есть, восстанавливаем
+            state_data = json.loads(profile.mods_state_json)
+            for m in mods:
+                # Ключи в JSON это строки, приводим к int
+                m_id_str = str(m.id)
+                if m_id_str in state_data:
+                    data = state_data[m_id_str]
+                    m.is_enabled = data["e"]
+                    m.priority = data["p"]
+                else:
+                    m.is_enabled = False
+                    m.priority = 0
+
+        session.commit()
+
+    def switch_game_folder(self):
+        """Вызывается из UI по кнопке смены папки"""
+        if not self._window: return
+
+        # 1. Спрашиваем новую папку
+        folder = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+        if not folder or not folder[0]: return {"status": "cancel"}
+        new_path = folder[0]
+
+        # Проверка на omsi.exe
+        if not os.path.exists(os.path.join(new_path, "Omsi.exe")):
+            return {"status": "error", "message": "В этой папке нет Omsi.exe!"}
+
+        if new_path == self.config_manager.game_path:
+            return {"status": "cancel"}
+
+        # 2. Сохраняем состояние старой папки
+        self._save_current_profile()
+
+        # 3. Меняем путь в конфиге
+        self.config_manager.set_game_path(new_path)
+
+        # 4. Загружаем состояние новой папки
+        self._load_profile(new_path)
+
+        return {
+            "status": "success",
+            "new_path": new_path,
+            "message": "Папка игры изменена. Список модов обновлен."
+        }
+
 
 if __name__ == '__main__':
     api = Api()

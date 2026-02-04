@@ -17,7 +17,16 @@
         <div class="w-3 h-3 rounded-full bg-blue-500"></div>
         <h1 class="font-bold text-lg text-blue-100 tracking-wide">OMSI 2 <span class="text-blue-500">Manager</span></h1>
     </div>
-    <div id="status-bar" class="text-xs text-gray-500 font-mono">Connecting...</div>
+
+    <!-- Изменили блок справа -->
+    <div class="flex items-center gap-3">
+        <div id="status-bar" class="text-xs text-gray-400 font-mono bg-gray-900 px-2 py-1 rounded border border-gray-700 max-w-[300px] truncate">
+            Connecting...
+        </div>
+        <button id="btn-change-game" class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded transition border border-gray-600" title="Сменить папку игры">
+            📂 Сменить игру
+        </button>
+    </div>
 </header>
 
 <!-- MAIN CONTENT AREA -->
