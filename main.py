@@ -89,7 +89,7 @@ class Api:
 
     def toggle_mod(self, mod_id):
         session = self.config_manager.session
-        mod = session.query(Mod).get(mod_id)
+        mod = session.get(Mod, mod_id)
         if not mod:
             return {"status": "error", "message": "Mod not found"}
         current_state = mod.is_enabled
