@@ -20,6 +20,29 @@ class ModType(enum.Enum):
 
 # --- МОДЕЛИ ---
 
+class HofInstall(Base):
+    """
+    Таблица отслеживания: какой HOF куда был закинут.
+    """
+    __tablename__ = 'hof_installs'
+
+    id = Column(Integer, primary_key=True)
+    hof_file_id = Column(Integer, ForeignKey('hof_files.id'))
+
+    # Имя папки автобуса (для UI)
+    bus_folder_name = Column(String, nullable=False)
+
+    # НОВЫЕ ПОЛЯ:
+    # Точный путь в игре, где мы создали симлинк (Vehicles/MAN/Spandau.hof)
+    game_rel_path = Column(String, nullable=False)
+
+    # Путь к бэкапу оригинального файла (если он был)
+    backup_path = Column(String, nullable=True)
+
+    install_date = Column(DateTime, default=datetime.now)
+
+    hof_file = relationship("HofFile", back_populates="installs")
+
 class GameProfile(Base):
     """
     Хранит состояние модов (включен/выключен/приоритет) для конкретной папки игры.
@@ -96,24 +119,6 @@ class HofFile(Base):
     mod = relationship("Mod", back_populates="hof_files")
     installs = relationship("HofInstall", back_populates="hof_file", cascade="all, delete-orphan")
 
-
-class HofInstall(Base):
-    """
-    Таблица отслеживания: какой HOF куда был закинут.
-    """
-    __tablename__ = 'hof_installs'
-
-    id = Column(Integer, primary_key=True)
-    hof_file_id = Column(Integer, ForeignKey('hof_files.id'))
-
-    # Имя папки автобуса в Vehicles, куда мы закинули этот файл (например "MAN_SD200")
-    bus_folder_name = Column(String, nullable=False)
-
-    install_date = Column(DateTime, default=datetime.now)
-
-    hof_file = relationship("HofFile", back_populates="installs")
-
-
 class InstalledFile(Base):
     """Таблица 'Журнал изменений'. Хранит, что мы поменяли в папке игры."""
     __tablename__ = 'game_file_state'
@@ -143,25 +148,40 @@ class AppSetting(Base):
 
 def init_db(db_path='manager.db'):
     engine = create_engine(f'sqlite:///{db_path}', echo=False)
+
+    # 1. Создаем новые таблицы (GameProfile), если их нет
     Base.metadata.create_all(engine)
 
+    # 2. Проверяем существующие таблицы на наличие новых колонок (Миграция)
     inspector = inspect(engine)
 
-    # Миграция для priority (старая)
-    cols_mods = [c['name'] for c in inspector.get_columns('mods')]
-    if 'priority' not in cols_mods:
-        with engine.connect() as conn:
+    with engine.connect() as conn:
+        # --- Миграция таблицы MODS (priority) ---
+        cols_mods = [c['name'] for c in inspector.get_columns('mods')]
+        if 'priority' not in cols_mods:
+            print("Migrating: adding 'priority' to 'mods'...")
             conn.execute(text("ALTER TABLE mods ADD COLUMN priority INTEGER DEFAULT 0"))
-            conn.commit()
 
-    # НОВАЯ МИГРАЦИЯ: Добавляем root_path в game_file_state
-    cols_inst = [c['name'] for c in inspector.get_columns('game_file_state')]
-    if 'root_path' not in cols_inst:
-        print("Migrating: adding 'root_path' to 'game_file_state'...")
-        with engine.connect() as conn:
-            # Добавляем колонку. По умолчанию пустая строка (для старых записей это не критично, они просто станут "сиротами")
+        # --- Миграция таблицы GAME_FILE_STATE (root_path) ---
+        cols_inst = [c['name'] for c in inspector.get_columns('game_file_state')]
+        if 'root_path' not in cols_inst:
+            print("Migrating: adding 'root_path' to 'game_file_state'...")
+            # Добавляем колонку с пустым дефолтным значением
             conn.execute(text("ALTER TABLE game_file_state ADD COLUMN root_path VARCHAR DEFAULT ''"))
-            conn.commit()
+
+        # --- Миграция таблицы HOF_INSTALLS (game_rel_path, backup_path) ---
+        cols_hof = [c['name'] for c in inspector.get_columns('hof_installs')]
+
+        if 'game_rel_path' not in cols_hof:
+            print("Migrating: adding 'game_rel_path' to 'hof_installs'...")
+            # Для старых записей ставим заглушку 'legacy', чтобы не упало (т.к. поле nullable=False в модели)
+            conn.execute(text("ALTER TABLE hof_installs ADD COLUMN game_rel_path VARCHAR DEFAULT 'legacy'"))
+
+        if 'backup_path' not in cols_hof:
+            print("Migrating: adding 'backup_path' to 'hof_installs'...")
+            conn.execute(text("ALTER TABLE hof_installs ADD COLUMN backup_path VARCHAR"))
+
+        conn.commit()
 
     Session = sessionmaker(bind=engine)
     return Session()

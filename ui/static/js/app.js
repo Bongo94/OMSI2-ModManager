@@ -391,3 +391,22 @@ window.deleteMod = async (modId) => {
         View.addLog("Ошибка удаления: " + result.message, 'error');
     }
 };
+
+document.getElementById('btn-uninstall-hofs').onclick = async () => {
+    if (!confirm("Вы уверены?\nЭто удалит все HOF файлы, добавленные через менеджер, и восстановит оригинальные файлы (если они были).")) {
+        return;
+    }
+
+    View.setLoading(true, "Восстановление оригинальных HOF...");
+
+    const res = await pywebview.api.uninstall_all_hofs();
+
+    View.setLoading(false);
+
+    if (res.status === 'success') {
+        View.addLog(res.message, 'success');
+        // Можно закрыть окно или обновить список, но особо обновлять нечего
+    } else {
+        alert(res.message);
+    }
+};

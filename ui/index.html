@@ -212,12 +212,8 @@
                 <span class="text-purple-400">🚌</span> HOF Инжектор
             </h3>
             <div class="space-x-2">
-                <button id="btn-scan-game-hof" class="text-xs btn-secondary border-purple-500/50 text-purple-200">🔍
-                    Найти HOF в игре
-                </button>
-                <button onclick="document.getElementById('hof-modal').classList.add('hidden')"
-                        class="text-gray-400 hover:text-white">✕
-                </button>
+                <button id="btn-scan-game-hof" class="text-xs btn-secondary border-purple-500/50 text-purple-200">🔍 Найти HOF в игре</button>
+                <button onclick="document.getElementById('hof-modal').classList.add('hidden')" class="text-gray-400 hover:text-white">✕</button>
             </div>
         </div>
 
@@ -256,7 +252,12 @@
         </div>
 
         <!-- Footer -->
-        <div class="p-4 border-t border-gray-700 bg-gray-900 flex justify-end">
+        <div class="p-4 border-t border-gray-700 bg-gray-900 flex justify-between">
+            <!-- НОВАЯ КНОПКА СЛЕВА -->
+            <button id="btn-uninstall-hofs" class="px-4 py-2 border border-red-800 text-red-400 hover:bg-red-900/30 rounded text-sm transition">
+                🗑 Отключить все HOF (Вернуть как было)
+            </button>
+
             <button id="btn-install-hofs" class="btn-primary bg-purple-600 hover:bg-purple-500 font-bold px-8">
                 Установить выбранное
             </button>

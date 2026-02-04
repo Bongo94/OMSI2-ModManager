@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlalchemy import func
 
 from core.database import HofFile, HofInstall, Mod
+from core.installer import ModInstaller
 
 
 class HofTools:
@@ -15,6 +16,10 @@ class HofTools:
         self.logger = logger
         self.game_root = Path(self.config.game_path)
         self.vehicles_path = self.game_root / "Vehicles"
+
+        # Используем логику инсталлятора для симлинков и бэкапов
+        self.installer = ModInstaller(config_manager, logger)
+
         self.hof_lib_path = Path(self.config.library_path) / "HOF_Storage"
         self.hof_lib_path.mkdir(parents=True, exist_ok=True)
 
@@ -57,7 +62,7 @@ class HofTools:
         """
         Ищет HOF в игре, которых НЕТ в библиотеке по имени файла.
         """
-        found_hofs = {} # name -> full_path
+        found_hofs = {}  # name -> full_path
 
         if not self.vehicles_path.exists():
             return []
@@ -297,7 +302,8 @@ class HofTools:
 
     def install_hofs_to_buses(self, hof_ids, bus_folder_names):
         """
-        Копирует выбранные HOF (ids) в выбранные автобусы (names).
+        Устанавливает HOF файлы через СИМЛИНКИ.
+        Если в папке есть оригинальный файл - делает бэкап.
         """
         hofs = self.session.query(HofFile).filter(HofFile.id.in_(hof_ids)).all()
 
@@ -305,44 +311,101 @@ class HofTools:
         current = 0
         errors = []
 
-        self.logger.log(f"Установка {len(hofs)} HOF в {len(bus_folder_names)} автобусов...", "info")
+        self.logger.log(f"Инъекция {len(hofs)} HOF в {len(bus_folder_names)} автобусов (Symlinks)...", "info")
 
         for bus_name in bus_folder_names:
-            bus_path = self.vehicles_path / bus_name
-            if not bus_path.exists(): continue
+            bus_path_rel = Path("Vehicles") / bus_name
+
+            # Проверка, что папка существует
+            if not (self.game_root / bus_path_rel).exists():
+                continue
 
             for hof in hofs:
                 current += 1
-                # Источник: Либо в папке мода, либо в HOF_Storage
-                # В базе путь может быть absolute или relative. Обработаем это.
-                src_candidate = Path(hof.full_source_path)
 
-                # Если путь не абсолютный, пробуем найти относительно библиотеки
+                # 1. Находим исходный файл в библиотеке
+                src_candidate = Path(hof.full_source_path)
                 if not src_candidate.is_absolute():
-                    # Проверяем в Mods
-                    temp = Path(self.config.library_path) / "Mods" / src_candidate
-                    if not temp.exists():
-                        # Проверяем в HOF_Storage (куда мы импортируем)
-                        temp = self.hof_lib_path / hof.filename
-                    src_candidate = temp
+                    # Пробуем найти в HOF хранилище
+                    temp = self.hof_lib_path / hof.filename
+                    if temp.exists():
+                        src_candidate = temp
+                    else:
+                        # Пробуем найти внутри мода
+                        temp = Path(self.config.library_path) / "Mods" / src_candidate
+                        src_candidate = temp
 
                 if not src_candidate.exists():
-                    errors.append(f"Source missing: {hof.filename}")
+                    errors.append(f"Missing source: {hof.filename}")
                     continue
 
-                target = bus_path / hof.filename
+                # 2. Определяем целевой путь
+                target_rel_path = bus_path_rel / hof.filename
 
                 try:
-                    shutil.copy2(src_candidate, target)
-                    # TODO: Можно записать в HofInstall, если нужна история
+                    # 3. Используем метод инсталлятора для безопасной установки (Симлинк + Бэкап)
+                    # _install_file_physically возвращает (backup_path, original_hash)
+                    # Она сама переместит оригинал в Backups, если он там был.
+                    backup, _ = self.installer._install_file_physically(target_rel_path, src_candidate)
+
+                    # 4. Записываем в БД
+                    install_record = HofInstall(
+                        hof_file_id=hof.id,
+                        bus_folder_name=bus_name,
+                        game_rel_path=str(target_rel_path),
+                        backup_path=backup
+                    )
+                    self.session.add(install_record)
+
                 except Exception as e:
                     errors.append(f"Err {bus_name}/{hof.filename}: {e}")
 
-                if current % 10 == 0:
+                if current % 5 == 0:
                     self.logger.log(None, "progress", int(current / total_ops * 100))
 
         self.session.commit()
 
         if errors:
             return False, f"Завершено с ошибками ({len(errors)})"
-        return True, "Все HOF файлы успешно скопированы!"
+        return True, "HOF файлы успешно привязаны (симлинки)!"
+
+    def uninstall_all_hofs(self):
+        """
+        Удаляет ВСЕ установленные через менеджер HOF файлы и восстанавливает оригиналы.
+        """
+        installs = self.session.query(HofInstall).all()
+        if not installs:
+            return True, "Нет установленных HOF файлов."
+
+        self.logger.log(f"Удаление {len(installs)} HOF файлов и восстановление оригиналов...", "info")
+
+        count = 0
+        for record in installs:
+            try:
+                # Формируем объект-пустышку, похожий на InstalledFile,
+                # чтобы скормить его методу _remove_installed_file инсталлятора
+                # (или делаем вручную, так как логика простая)
+
+                target_full = self.game_root / record.game_path
+
+                # 1. Удаляем симлинк
+                if target_full.is_symlink() or target_full.exists():
+                    if target_full.is_dir():
+                        shutil.rmtree(target_full)
+                    else:
+                        target_full.unlink()
+
+                # 2. Восстанавливаем бэкап
+                if record.backup_path:
+                    backup = Path(record.backup_path)
+                    if backup.exists() and not target_full.exists():
+                        shutil.move(str(backup), str(target_full))
+
+                # 3. Удаляем запись
+                self.session.delete(record)
+                count += 1
+            except Exception as e:
+                self.logger.log(f"Ошибка отката {record.game_rel_path}: {e}", "warning")
+
+        self.session.commit()
+        return True, f"Откачено {count} файлов. Оригиналы восстановлены."

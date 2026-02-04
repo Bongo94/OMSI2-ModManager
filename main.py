@@ -171,11 +171,6 @@ class Api:
         count = tools.import_game_hofs(hof_list)
         return {"status": "success", "message": f"Импортировано {count} файлов."}
 
-    def install_hofs(self, hof_ids, bus_names):
-        tools = HofTools(self.config_manager, self._logger)
-        success, msg = tools.install_hofs_to_buses(hof_ids, bus_names)
-        return {"status": "success" if success else "warning", "message": msg}
-
     def _save_current_profile(self):
         """Сохраняет текущее состояние модов в профиль текущей папки"""
         current_path = self.config_manager.game_path
@@ -262,6 +257,17 @@ class Api:
             "new_path": new_path,
             "message": "Папка игры изменена. Список модов обновлен."
         }
+
+    def install_hofs(self, hof_ids, bus_names):
+        tools = HofTools(self.config_manager, self._logger)
+        success, msg = tools.install_hofs_to_buses(hof_ids, bus_names)
+        return {"status": "success" if success else "warning", "message": msg}
+
+    # НОВЫЙ МЕТОД
+    def uninstall_all_hofs(self):
+        tools = HofTools(self.config_manager, self._logger)
+        success, msg = tools.uninstall_all_hofs()
+        return {"status": "success", "message": msg}
 
 
 if __name__ == '__main__':
