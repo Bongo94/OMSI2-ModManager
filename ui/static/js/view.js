@@ -1,4 +1,42 @@
+// --- Переменная для текущего языка ---
+let currentLang = 'en';
+
 const View = {
+    // --- Локализация ---
+    setLanguage: (lang) => {
+        if (!Locales[lang]) lang = 'en';
+        currentLang = lang;
+
+        // 1. Обновляем все data-i18n элементы
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (Locales[lang][key]) {
+                el.innerText = Locales[lang][key];
+            }
+        });
+
+        // 2. Обновляем плейсхолдеры
+        document.querySelectorAll('input[placeholder]').forEach(el => {
+            // Простая проверка, можно улучшить data-i18n-placeholder
+            if (el.id.includes('path-input')) el.placeholder = Locales[lang]['ph_select'];
+        });
+
+        // 3. Активность кнопок языка
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+            if (btn.dataset.lang === lang) {
+                btn.classList.add('text-[#ff8128]', 'bg-[#222]');
+                btn.classList.remove('text-[#888]');
+            } else {
+                btn.classList.remove('text-[#ff8128]', 'bg-[#222]');
+                btn.classList.add('text-[#888]');
+            }
+        });
+    },
+
+    // Вспомогательная функция для получения текста в JS
+    t: (key) => {
+        return Locales[currentLang][key] || key;
+    },
     // --- Экраны ---
     showSetup: () => {
         document.getElementById('main-screen').classList.add('hidden');
@@ -46,7 +84,7 @@ const View = {
     },
 
     // --- Таблица модов (Grid Layout) ---
-    renderModList: (mods) => {
+renderModList: (mods) => {
         const container = document.getElementById('mod-table-body');
         const emptyState = document.getElementById('empty-state');
         container.innerHTML = '';
@@ -59,23 +97,28 @@ const View = {
 
         mods.forEach(mod => {
             const row = document.createElement('div');
-            // Grid layout matching the header
             row.className = 'grid grid-cols-12 gap-4 items-center p-3 bg-[#1a1a1a] border border-[#333] rounded hover:border-[#555] hover:bg-[#202020] transition group animate-fade-in mb-2';
 
+            // Перевод Типов
+            let typeKey = 'type_unknown';
+            if (mod.type === 'bus') typeKey = 'type_bus';
+            if (mod.type === 'map') typeKey = 'type_map';
+            if (mod.type === 'scenery') typeKey = 'type_scenery';
+
+            const typeLabel = View.t(typeKey);
+
             // Badge Colors
-            let typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#333] text-[#888] border border-[#444]">${mod.type}</span>`;
-            if (mod.type === 'bus') typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#333] text-[#ff8128] border border-[#ff8128]/30">BUS</span>`;
-            if (mod.type === 'map') typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#333] text-purple-400 border border-purple-500/30">MAP</span>`;
+            let typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#333] text-[#888] border border-[#444]">${typeLabel}</span>`;
+            if (mod.type === 'bus') typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#333] text-[#ff8128] border border-[#ff8128]/30">${typeLabel}</span>`;
+            if (mod.type === 'map') typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#333] text-purple-400 border border-purple-500/30">${typeLabel}</span>`;
 
-            // Status Indicator
+            // Status Indicator (Translated)
             let statusHtml = mod.is_enabled
-                ? `<div class="flex items-center justify-center gap-2 text-[#22c55e] text-xs font-bold tracking-wider"><div class="w-2 h-2 rounded-full bg-[#22c55e] shadow-[0_0_10px_#22c55e]"></div> ACTIVE</div>`
-                : `<div class="flex items-center justify-center gap-2 text-[#555] text-xs font-bold tracking-wider"><div class="w-2 h-2 rounded-full bg-[#333]"></div> OFF</div>`;
+                ? `<div class="flex items-center justify-center gap-2 text-[#22c55e] text-xs font-bold tracking-wider"><div class="w-2 h-2 rounded-full bg-[#22c55e] shadow-[0_0_10px_#22c55e]"></div> ${View.t('status_active')}</div>`
+                : `<div class="flex items-center justify-center gap-2 text-[#555] text-xs font-bold tracking-wider"><div class="w-2 h-2 rounded-full bg-[#333]"></div> ${View.t('status_off')}</div>`;
 
-            // Button style for Toggle
-            const toggleBtnClass = mod.is_enabled
-                ? 'text-[#22c55e] hover:text-[#16a34a] border border-[#22c55e]/30 bg-[#22c55e]/10'
-                : 'text-[#888] hover:text-white border border-[#444] bg-[#222]';
+            // ... остальное создание HTML остается прежним ...
+            // (Кнопки toggleMod, deleteMod)
 
             row.innerHTML = `
                 <div class="col-span-5 font-medium text-white flex items-center gap-3 pl-2 overflow-hidden">
@@ -86,10 +129,10 @@ const View = {
                 <div class="col-span-2 text-center text-[#666] text-xs font-mono">${mod.date}</div>
                 <div class="col-span-2 text-center">${statusHtml}</div>
                 <div class="col-span-1 text-right flex justify-end gap-2 pr-2">
-                    <button onclick="toggleMod(${mod.id})" class="w-8 h-8 rounded flex items-center justify-center transition ${toggleBtnClass}" title="Toggle Mod">
+                    <button onclick="toggleMod(${mod.id})" class="w-8 h-8 rounded flex items-center justify-center transition ${mod.is_enabled ? 'text-[#22c55e] bg-[#22c55e]/10' : 'text-[#888] hover:text-white bg-[#222]'}" title="Toggle">
                         <i class="fas fa-power-off"></i>
                     </button>
-                    <button onclick="deleteMod(${mod.id})" class="w-8 h-8 rounded flex items-center justify-center text-[#555] hover:text-red-500 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition" title="Uninstall">
+                    <button onclick="deleteMod(${mod.id})" class="w-8 h-8 rounded flex items-center justify-center text-[#555] hover:text-red-500 hover:bg-red-500/10 transition" title="Delete">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>

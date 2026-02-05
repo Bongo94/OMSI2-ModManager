@@ -39,7 +39,13 @@ class Api:
         return {
             "game_path": self.config_manager.game_path,
             "library_path": self.config_manager.library_path,
+            "language": self.config_manager._get_setting("language") or "en"  # По умолчанию английский
         }
+
+    # --- Новые методы ---
+    def set_language(self, lang):
+        self.config_manager._set_setting("language", lang)
+        return {"status": "success", "lang": lang}
 
     def browse_folder(self):
         if not self._window: return None

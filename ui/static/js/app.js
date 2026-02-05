@@ -6,26 +6,49 @@ let currentPreviewData = null;
 window.addLog = View.addLog;
 window.updateProgress = View.updateProgress;
 
-// --- MAIN INIT ---
-window.addEventListener('pywebviewready', async function () {
-    View.addLog("Интерфейс инициализирован.", "info");
+// --- Global Language Switcher ---
+window.changeLang = async (lang) => {
+    // 1. Обновляем UI
+    View.setLanguage(lang);
 
-    // Проверка статуса при запуске
+    // 2. Сохраняем в Python
+    try {
+        await pywebview.api.set_language(lang);
+    } catch (e) {
+        console.error("Failed to save lang", e);
+    }
+
+    // 3. Если мы на главном экране, перерисовываем список,
+    // чтобы обновились переводы внутри таблицы (Тип, Статус)
+    const list = document.getElementById('mod-table-body');
+    if (list.innerHTML !== "") {
+        loadMods();
+    }
+};
+
+// --- INIT ---
+window.addEventListener('pywebviewready', async function () {
     try {
         const config = await pywebview.api.get_config();
 
+        // Устанавливаем язык из конфига (или дефолт)
+        if (config.language) {
+            View.setLanguage(config.language);
+        } else {
+            View.setLanguage('en');
+        }
+
         if (config.game_path && config.library_path) {
-            document.getElementById('status-bar').innerText = config.game_path; // Показываем путь
+            document.getElementById('status-bar').innerText = config.game_path;
             document.getElementById('status-bar').title = config.game_path;
             View.showMain();
             loadMods();
         } else {
-            document.getElementById('status-bar').innerText = 'Требуется настройка';
             View.showSetup();
         }
     } catch (e) {
         console.error(e);
-        View.addLog("Ошибка соединения с API: " + e, "error");
+        View.addLog("API Error: " + e, "error");
     }
 });
 
