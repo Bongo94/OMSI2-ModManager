@@ -16,75 +16,40 @@ const View = {
         const line = document.createElement('div');
 
         const time = new Date().toLocaleTimeString('ru-RU');
-        let colorClass = 'text-gray-300';
+        let colorClass = 'text-[#aaa]'; // Default gray
         let prefix = 'INFO';
+        let prefixColor = 'text-[#555]';
 
         if (level === 'error') {
-            colorClass = 'text-red-400 font-bold';
+            colorClass = 'text-red-400';
             prefix = 'ERR';
+            prefixColor = 'text-red-500 font-bold';
         }
         if (level === 'warning') {
             colorClass = 'text-yellow-400';
             prefix = 'WARN';
+            prefixColor = 'text-yellow-500';
         }
         if (level === 'success') {
             colorClass = 'text-green-400';
             prefix = 'OK';
+            prefixColor = 'text-green-500';
         }
 
-        line.innerHTML = `<span class="text-gray-600 select-none mr-2">[${time}]</span><span class="text-xs font-bold w-8 inline-block opacity-50">${prefix}</span> <span class="${colorClass}">${msg}</span>`;
+        line.innerHTML = `
+            <span class="text-[#444] select-none mr-2 font-mono">[${time}]</span>
+            <span class="${prefixColor} w-8 inline-block text-[10px]">${prefix}</span> 
+            <span class="${colorClass}">${msg}</span>
+        `;
         container.appendChild(line);
         container.scrollTop = container.scrollHeight;
     },
 
-    // Добавить в объект View
-renderLoadOrder: (mods) => {
-        const container = document.getElementById('load-order-list');
-        container.innerHTML = '';
-
-        if (!mods || mods.length === 0) {
-            container.innerHTML = '<div class="text-gray-500 text-center mt-10">Конфликтов не обнаружено.<br>Моды не пересекаются файлами (кроме Fonts).</div>';
-            return;
-        }
-
-        // mods приходит отсортированный по приоритету базы (0..99).
-        // 99 - это победитель. Мы хотим, чтобы Победитель был ВВЕРХУ списка (№1).
-        // Значит, сортируем массив: от большего к меньшему, перед отрисовкой.
-        // Но `get_conflicts` возвращает order_by(Mod.priority) -> [0, 1, 2...].
-        // Значит последний элемент списка API - это победитель.
-        // Нам нужно отобразить его первым.
-
-        const sortedForUI = [...mods].reverse();
-
-        sortedForUI.forEach((mod, index) => {
-            const div = document.createElement('div');
-            // ... (остальной код создания элемента тот же) ...
-            // Добавим подпись "Перезаписывает всех ниже" для первого элемента
-            let badge = '';
-            if (index === 0 && mods.length > 1) {
-                badge = '<span class="text-[10px] bg-green-900 text-green-300 px-1 rounded ml-2">ГЛАВНЫЙ</span>';
-            }
-
-            div.innerHTML = `
-                <div class="flex items-center gap-3">
-                    <span class="text-gray-500 font-mono text-xs w-6">${index + 1}.</span>
-                    <span class="font-medium text-gray-200">${mod.name}</span>
-                    ${badge}
-                </div>
-                <div class="flex gap-1 opacity-50 group-hover:opacity-100">
-                    <button onclick="moveItem(this, -1)" class="p-1 hover:text-white">⬆️</button>
-                    <button onclick="moveItem(this, 1)" class="p-1 hover:text-white">⬇️</button>
-                </div>
-            `;
-            container.appendChild(div);
-        });
-    },
-
-    // --- Таблица модов ---
+    // --- Таблица модов (Grid Layout) ---
     renderModList: (mods) => {
-        const tbody = document.getElementById('mod-table-body');
+        const container = document.getElementById('mod-table-body');
         const emptyState = document.getElementById('empty-state');
-        tbody.innerHTML = '';
+        container.innerHTML = '';
 
         if (!mods || mods.length === 0) {
             emptyState.classList.remove('hidden');
@@ -93,34 +58,43 @@ renderLoadOrder: (mods) => {
         emptyState.classList.add('hidden');
 
         mods.forEach(mod => {
-            const tr = document.createElement('tr');
-            tr.className = 'hover:bg-gray-700/50 transition duration-150 border-b border-gray-700/50 new-row';
+            const row = document.createElement('div');
+            // Grid layout matching the header
+            row.className = 'grid grid-cols-12 gap-4 items-center p-3 bg-[#1a1a1a] border border-[#333] rounded hover:border-[#555] hover:bg-[#202020] transition group animate-fade-in mb-2';
 
-            // Цвет бейджика типа
-            let typeColor = 'bg-gray-600';
-            if (mod.type === 'bus') typeColor = 'bg-yellow-600 text-yellow-100';
-            if (mod.type === 'map') typeColor = 'bg-purple-600 text-purple-100';
-            if (mod.type === 'mixed') typeColor = 'bg-blue-600 text-blue-100';
+            // Badge Colors
+            let typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#333] text-[#888] border border-[#444]">${mod.type}</span>`;
+            if (mod.type === 'bus') typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#333] text-[#ff8128] border border-[#ff8128]/30">BUS</span>`;
+            if (mod.type === 'map') typeBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#333] text-purple-400 border border-purple-500/30">MAP</span>`;
 
-            tr.innerHTML = `
-                <td class="p-4 font-medium text-white flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full ${mod.is_enabled ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}"></span>
-                    ${mod.name}
-                </td>
-                <td class="p-4"><span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${typeColor}">${mod.type}</span></td>
-                <td class="p-4 text-gray-400 font-mono text-xs">${mod.date}</td>
-                <td class="p-4 text-xs font-semibold ${mod.is_enabled ? 'text-green-400' : 'text-gray-500'}">
-                    ${mod.is_enabled ? 'АКТИВЕН' : 'ОТКЛЮЧЕН'}
-                </td>
-                <td class="p-4 text-right space-x-2">
-                    <!-- ДОБАВЛЕН ONCLICK -->
-                    <button onclick="toggleMod(${mod.id})" class="text-gray-400 hover:text-white transition group" title="Включить/Выключить">
-                        <span class="group-active:scale-90 inline-block">⏯</span>
+            // Status Indicator
+            let statusHtml = mod.is_enabled
+                ? `<div class="flex items-center justify-center gap-2 text-[#22c55e] text-xs font-bold tracking-wider"><div class="w-2 h-2 rounded-full bg-[#22c55e] shadow-[0_0_10px_#22c55e]"></div> ACTIVE</div>`
+                : `<div class="flex items-center justify-center gap-2 text-[#555] text-xs font-bold tracking-wider"><div class="w-2 h-2 rounded-full bg-[#333]"></div> OFF</div>`;
+
+            // Button style for Toggle
+            const toggleBtnClass = mod.is_enabled
+                ? 'text-[#22c55e] hover:text-[#16a34a] border border-[#22c55e]/30 bg-[#22c55e]/10'
+                : 'text-[#888] hover:text-white border border-[#444] bg-[#222]';
+
+            row.innerHTML = `
+                <div class="col-span-5 font-medium text-white flex items-center gap-3 pl-2 overflow-hidden">
+                    <i class="fas ${mod.type === 'bus' ? 'fa-bus' : mod.type === 'map' ? 'fa-map' : 'fa-box'} text-[#444] group-hover:text-[#ff8128] transition"></i>
+                    <span class="truncate">${mod.name}</span>
+                </div>
+                <div class="col-span-2 text-center">${typeBadge}</div>
+                <div class="col-span-2 text-center text-[#666] text-xs font-mono">${mod.date}</div>
+                <div class="col-span-2 text-center">${statusHtml}</div>
+                <div class="col-span-1 text-right flex justify-end gap-2 pr-2">
+                    <button onclick="toggleMod(${mod.id})" class="w-8 h-8 rounded flex items-center justify-center transition ${toggleBtnClass}" title="Toggle Mod">
+                        <i class="fas fa-power-off"></i>
                     </button>
-                    <button onclick="deleteMod(${mod.id})" class="text-red-400 hover:text-red-300 transition" title="Удалить">🗑</button>
-                </td>
+                    <button onclick="deleteMod(${mod.id})" class="w-8 h-8 rounded flex items-center justify-center text-[#555] hover:text-red-500 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition" title="Uninstall">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
             `;
-            tbody.appendChild(tr);
+            container.appendChild(row);
         });
     },
 
@@ -132,40 +106,33 @@ renderLoadOrder: (mods) => {
         const mappedContainer = document.getElementById('mapped-rows');
         mappedContainer.innerHTML = '';
 
-        // Скрываем левую панель "Ошибок"
         document.getElementById('unmapped-panel').classList.add('hidden');
 
-        // Расширяем правую панель
+        // Reset styles for full width
         const rightPanel = document.getElementById('mapped-list').parentElement;
-        rightPanel.classList.remove('md:w-2/3');
-        rightPanel.classList.add('w-full');
+        rightPanel.parentElement.classList.remove('md:flex-row'); // remove flex row if needed logic
 
         let html = '';
         data.mapped_files.forEach(f => {
-            let targetClass = 'text-green-400';
-            let icon = '→';
+            let color = 'text-[#aaa]'; // Default source
+            let targetColor = 'text-[#22c55e]'; // Green
+            let icon = '<i class="fas fa-arrow-right text-[10px] mx-2 opacity-30"></i>';
             let targetText = f.target;
 
-            // Стилизация для Addons
             if (f.status === 'addon') {
-                targetClass = 'text-yellow-500';
-                icon = '📂';
+                targetColor = 'text-yellow-500'; // Addon dir
             }
 
-            // Стилизация для HOF
             if (f.status === 'hof') {
-                targetClass = 'text-purple-400 font-bold';
-                icon = '💾';
-                targetText = 'БУДЕТ ИЗВЛЕЧЕН В БИБЛИОТЕКУ';
+                targetColor = 'text-[#ff8128] font-bold';
+                targetText = '[ HOF LIBRARY ]';
             }
 
             html += `
-            <div class="flex p-2 hover:bg-gray-700/30 border-b border-gray-700/30 text-xs">
-                <div class="w-1/2 break-all pr-2 text-gray-400 flex items-center gap-2">
-                   ${f.source}
-                </div>
-                <div class="w-1/2 break-all font-mono ${targetClass}">
-                   <span class="mr-1 opacity-50">${icon}</span> ${targetText}
+            <div class="flex items-center p-2 hover:bg-[#222] border-b border-[#222] text-xs font-mono transition">
+                <div class="w-1/2 break-all text-[#666] pl-2">${f.source}</div>
+                <div class="w-1/2 break-all ${targetColor} flex items-center">
+                   ${icon} ${targetText}
                 </div>
             </div>`;
         });
@@ -178,21 +145,65 @@ renderLoadOrder: (mods) => {
         document.getElementById('review-modal').classList.add('hidden');
     },
 
+    // --- Load Order UI ---
+    renderLoadOrder: (mods) => {
+        const container = document.getElementById('load-order-list');
+        container.innerHTML = '';
+
+        if (!mods || mods.length === 0) {
+            container.innerHTML = `
+                <div class="text-[#555] text-center mt-10 flex flex-col items-center">
+                    <i class="fas fa-check-circle text-4xl mb-2 opacity-20"></i>
+                    <span>No file conflicts detected.</span>
+                </div>`;
+            return;
+        }
+
+        const sortedForUI = [...mods].reverse();
+
+        sortedForUI.forEach((mod, index) => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between bg-[#111] p-3 mb-1 border border-[#333] rounded group';
+            div.dataset.id = mod.id;
+
+            let badge = '';
+            let orderNum = `<span class="text-[#444] font-mono mr-3 text-sm w-6">${index + 1}.</span>`;
+
+            if (index === 0 && mods.length > 1) {
+                badge = '<span class="text-[10px] bg-[#22c55e]/10 text-[#22c55e] px-2 py-0.5 rounded border border-[#22c55e]/30 ml-2">WINNER</span>';
+                orderNum = `<span class="text-[#ff8128] font-bold font-mono mr-3 text-sm w-6">1.</span>`;
+            }
+
+            div.innerHTML = `
+                <div class="flex items-center">
+                    ${orderNum}
+                    <span class="text-[#e0e0e0] font-medium">${mod.name}</span>
+                    ${badge}
+                </div>
+                <div class="flex gap-1 opacity-30 group-hover:opacity-100 transition">
+                    <button onclick="moveItem(this, -1)" class="w-6 h-6 rounded bg-[#222] hover:bg-[#ff8128] hover:text-black flex items-center justify-center text-[#888]"><i class="fas fa-chevron-up text-[10px]"></i></button>
+                    <button onclick="moveItem(this, 1)" class="w-6 h-6 rounded bg-[#222] hover:bg-[#ff8128] hover:text-black flex items-center justify-center text-[#888]"><i class="fas fa-chevron-down text-[10px]"></i></button>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    },
+
     updateProgress: (percent, message) => {
         const bar = document.getElementById('progress-bar');
         const text = document.getElementById('progress-text');
 
         bar.style.width = `${percent}%`;
-        text.innerText = message || `Прогресс: ${percent}%`;
+        text.innerText = message || `${percent}%`;
     },
 
-    setLoading: (isLoading, title = "Обработка...") => {
+    setLoading: (isLoading, title = "PROCESSING") => {
         const el = document.getElementById('loading-modal');
         const titleEl = document.getElementById('loading-title');
 
         if (isLoading) {
             titleEl.innerText = title;
-            View.updateProgress(0, 'Начинаем...'); // Сбрасываем прогресс-бар
+            View.updateProgress(0, 'Initializing...');
             el.classList.remove('hidden');
         } else {
             el.classList.add('hidden');

@@ -3,122 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OMSI 2 Mod Manager</title>
-    <!-- Tailwind CSS (CDN для прототипа, в релизе лучше скачать) -->
+    <title>OMSI 2 Mod Manager by Bongo94</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Наши стили -->
     <link rel="stylesheet" href="static/css/style.css">
+    <!-- Font Awesome для иконок -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="h-screen flex flex-col bg-gray-900 text-gray-200 font-sans select-none">
+<body class="h-screen flex flex-col overflow-hidden selection:bg-orange-500 selection:text-black">
 
 <!-- HEADER -->
-<header class="bg-gray-800 p-3 shadow-md border-b border-gray-700 flex justify-between items-center z-10">
-    <div class="flex items-center gap-2">
-        <div class="w-3 h-3 rounded-full bg-blue-500"></div>
-        <h1 class="font-bold text-lg text-blue-100 tracking-wide">OMSI 2 <span class="text-blue-500">Manager</span></h1>
+<header class="h-16 flex items-center justify-between px-6 bg-[#1a1a1a] border-b border-[#333] z-20 shadow-lg">
+    <!-- Logo area -->
+    <div class="flex items-center gap-4">
+        <div class="text-2xl font-black italic tracking-tighter text-white font-[Orbitron]">
+            OMSI 2 <span class="text-[#ff8128]">MANAGER</span>
+        </div>
+        <div class="h-6 w-px bg-[#333]"></div>
+        <div class="flex flex-col">
+            <span class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Developed by</span>
+            <a href="https://github.com/Bongo94" target="_blank" class="text-xs font-bold text-white hover:text-[#ff8128] transition font-[Orbitron]">
+                BONGO94
+            </a>
+        </div>
     </div>
 
-    <!-- Изменили блок справа -->
-    <div class="flex items-center gap-3">
-        <div id="status-bar" class="text-xs text-gray-400 font-mono bg-gray-900 px-2 py-1 rounded border border-gray-700 max-w-[300px] truncate">
-            Connecting...
+    <!-- Right Actions -->
+    <div class="flex items-center gap-4">
+        <!-- Status Bar -->
+        <div class="hidden md:flex flex-col items-end mr-4">
+            <span class="text-[10px] text-gray-500 uppercase">Game Path</span>
+            <div id="status-bar" class="text-xs text-[#888] font-mono max-w-[200px] truncate" title="Путь к игре">Connecting...</div>
         </div>
-        <button id="btn-change-game" class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded transition border border-gray-600" title="Сменить папку игры">
-            📂 Сменить игру
+
+        <a href="https://github.com/Bongo94/OMSI2-ModManager" target="_blank" class="text-[#888] hover:text-white transition text-xl" title="GitHub Repo">
+            <i class="fab fa-github"></i>
+        </a>
+
+        <button id="btn-change-game" class="btn btn-secondary text-xs py-1 px-3">
+            <i class="fas fa-folder-open mr-2"></i> Change Game
         </button>
     </div>
 </header>
 
-<!-- MAIN CONTENT AREA -->
-<main class="flex-1 flex flex-col overflow-hidden relative">
+<!-- MAIN CONTENT -->
+<main class="flex-1 flex flex-col relative overflow-hidden bg-[#0d0d0d]">
 
-    <!-- 1. SETUP SCREEN (Экран первой настройки) -->
-    <div id="setup-screen" class="hidden m-auto w-full max-w-lg">
-        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-700">
-            <h2 class="text-2xl font-bold mb-6 text-white text-center">Добро пожаловать</h2>
+    <!-- SETUP SCREEN -->
+    <div id="setup-screen" class="hidden absolute inset-0 z-50 flex items-center justify-center bg-[#0d0d0d]">
+        <div class="glass-panel p-10 rounded-xl w-full max-w-lg border-t-4 border-[#ff8128]">
+            <h2 class="text-3xl font-bold mb-2 text-white text-center">INITIAL SETUP</h2>
+            <p class="text-center text-[#888] mb-8 text-sm">Configure your paths to start using the manager</p>
 
-            <div class="space-y-4">
+            <div class="space-y-6">
                 <div>
-                    <label class="block text-sm text-gray-400 mb-1">Папка с игрой OMSI 2</label>
+                    <label class="block text-xs uppercase font-bold text-[#ff8128] mb-2 tracking-wider">OMSI 2 Root Directory</label>
                     <div class="flex gap-2">
-                        <input type="text" id="game-path-input"
-                               class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-sm text-white" readonly
-                               placeholder="Выберите папку...">
-                        <button id="btn-browse-game" class="btn-secondary">...</button>
+                        <input type="text" id="game-path-input" class="flex-1 bg-black border border-[#333] rounded p-3 text-sm text-white focus:border-[#ff8128] outline-none transition" readonly placeholder="Select folder...">
+                        <button id="btn-browse-game" class="btn btn-secondary px-4"><i class="fas fa-search"></i></button>
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-sm text-gray-400 mb-1">Библиотека модов (Где хранить архивы)</label>
+                    <label class="block text-xs uppercase font-bold text-[#ff8128] mb-2 tracking-wider">Mod Library Storage</label>
                     <div class="flex gap-2">
-                        <input type="text" id="lib-path-input"
-                               class="w-full bg-gray-900 border border-gray-600 rounded p-2 text-sm text-white" readonly
-                               placeholder="Выберите папку...">
-                        <button id="btn-browse-lib" class="btn-secondary">...</button>
+                        <input type="text" id="lib-path-input" class="flex-1 bg-black border border-[#333] rounded p-3 text-sm text-white focus:border-[#ff8128] outline-none transition" readonly placeholder="Select folder...">
+                        <button id="btn-browse-lib" class="btn btn-secondary px-4"><i class="fas fa-search"></i></button>
                     </div>
                 </div>
             </div>
 
-            <button id="btn-save-settings" class="w-full mt-8 btn-primary py-3 font-bold text-lg">Начать работу</button>
-        </div>
-    </div>
-
-    <!-- 2. DASHBOARD (Основной экран) -->
-    <div id="main-screen" class="hidden flex-1 flex flex-col p-4">
-        <!-- Toolbar -->
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-semibold text-gray-100">Установленные моды</h2>
-            <div class="flex gap-3">
-                <button id="btn-refresh" class="btn-secondary text-sm">↻ Обновить</button>
-                <button id="btn-add-mod" class="btn-primary text-sm shadow-lg shadow-blue-900/50">+ Добавить мод
-                </button>
-                <button id="btn-conflicts" class="btn-secondary text-sm ml-2">⚠️ Порядок / Конфликты</button>
-                <button id="btn-hof-manager"
-                        class="btn-secondary text-sm ml-2 bg-purple-900/40 border-purple-500/30 hover:bg-purple-900/60">
-                    🚌 HOF Manager
-                </button>
-            </div>
-        </div>
-
-        <!-- Table Container -->
-        <div class="flex-1 overflow-auto bg-gray-800 rounded-lg border border-gray-700 custom-scrollbar">
-            <table class="w-full text-left text-sm">
-                <thead class="bg-gray-900 text-gray-400 sticky top-0 z-0 shadow-sm">
-                <tr>
-                    <th class="p-4 font-medium w-1/3">Название</th>
-                    <th class="p-4 font-medium">Тип</th>
-                    <th class="p-4 font-medium">Дата установки</th>
-                    <th class="p-4 font-medium">Статус</th>
-                    <th class="p-4 font-medium text-right">Действия</th>
-                </tr>
-                </thead>
-                <tbody id="mod-table-body" class="divide-y divide-gray-700 text-gray-300">
-                <!-- JS заполнит это -->
-                </tbody>
-            </table>
-
-            <!-- Заглушка, если пусто -->
-            <div id="empty-state"
-                 class="hidden h-full flex flex-col items-center justify-center text-gray-500 opacity-50">
-                <svg class="w-16 h-16 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2 2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
-                </svg>
-                <p>Библиотека пуста</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- 3. LOG CONSOLE (Всегда внизу) -->
-    <div class="h-40 bg-black border-t border-gray-700 flex flex-col">
-        <div class="px-2 py-1 bg-gray-800 text-xs text-gray-400 border-b border-gray-700 flex justify-between">
-            <span>SYSTEM LOG</span>
-            <button onclick="document.getElementById('log-container').innerHTML=''" class="hover:text-white">Clear
+            <button id="btn-save-settings" class="w-full mt-10 btn btn-primary py-3 text-lg">
+                GET STARTED <i class="fas fa-arrow-right ml-2"></i>
             </button>
         </div>
-        <div id="log-container" class="flex-1 overflow-y-auto p-2 font-mono text-xs space-y-1 custom-scrollbar">
-            <!-- Логи из Python -->
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="main-screen" class="hidden flex-1 flex flex-col p-6 overflow-hidden">
+
+        <!-- Toolbar -->
+        <div class="flex justify-between items-end mb-6">
+            <div>
+                <h2 class="text-2xl text-white mb-1">Installed Mods</h2>
+                <p class="text-xs text-[#888]">Manage your library efficiently</p>
+            </div>
+
+            <div class="flex gap-3">
+                <button id="btn-refresh" class="btn btn-secondary text-xs" title="Обновить список">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button id="btn-hof-manager" class="btn btn-secondary">
+                    <i class="fas fa-bus text-[#ff8128] mr-2"></i> HOF Manager
+                </button>
+                <button id="btn-conflicts" class="btn btn-secondary">
+                    <i class="fas fa-sort-amount-down mr-2"></i> Load Order
+                </button>
+                <button id="btn-add-mod" class="btn btn-primary">
+                    <i class="fas fa-plus mr-2"></i> Install Mod
+                </button>
+            </div>
         </div>
+
+        <!-- Mods Table/Grid -->
+        <div class="flex-1 glass-panel rounded-lg flex flex-col overflow-hidden">
+            <!-- Header -->
+            <div class="grid grid-cols-12 gap-4 p-4 bg-[#151515] border-b border-[#333] text-xs font-bold text-[#888] uppercase tracking-wider">
+                <div class="col-span-5">Mod Name</div>
+                <div class="col-span-2 text-center">Type</div>
+                <div class="col-span-2 text-center">Date</div>
+                <div class="col-span-2 text-center">Status</div>
+                <div class="col-span-1 text-right">Actions</div>
+            </div>
+
+            <!-- List -->
+            <div id="mod-table-body" class="flex-1 overflow-y-auto p-2 space-y-1">
+                <!-- JS Inject -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="hidden h-full flex flex-col items-center justify-center opacity-30">
+                <i class="fas fa-box-open text-6xl text-[#ff8128] mb-4"></i>
+                <p class="text-xl font-[Orbitron]">LIBRARY IS EMPTY</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- TERMINAL / LOGS -->
+    <div class="h-32 bg-[#050505] border-t border-[#333] flex flex-col font-mono">
+        <div class="px-4 py-1 bg-[#111] border-b border-[#222] flex justify-between items-center text-[10px] text-[#555]">
+            <span class="font-bold text-[#ff8128]">SYSTEM TERMINAL</span>
+            <button onclick="document.getElementById('log-container').innerHTML=''" class="hover:text-white transition">CLEAR</button>
+        </div>
+        <div id="log-container" class="flex-1 overflow-y-auto p-2 text-xs space-y-1 text-[#aaa] selection:bg-[#ff8128] selection:text-black"></div>
     </div>
 
 </main>
@@ -126,174 +142,127 @@
 <!-- MODALS -->
 
 <!-- Review Modal -->
-<div id="review-modal"
-     class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center transition-opacity">
-    <div class="bg-gray-800 w-[90%] h-[85%] flex flex-col rounded-xl shadow-2xl border border-gray-600 overflow-hidden">
-        <!-- Header -->
-        <div class="p-5 border-b border-gray-700 bg-gray-900 flex justify-between items-center">
+<div id="review-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center">
+    <div class="bg-[#1a1a1a] w-[90%] h-[85%] flex flex-col rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-[#333] overflow-hidden">
+        <div class="p-6 border-b border-[#333] bg-[#151515] flex justify-between items-center">
             <div>
-                <h3 class="text-xl font-bold text-white">Установка: <span id="review-mod-name"
-                                                                          class="text-blue-400">...</span></h3>
-                <p class="text-xs text-gray-400 mt-1">Проверьте файлы перед установкой</p>
+                <div class="text-[10px] text-[#ff8128] uppercase font-bold tracking-widest mb-1">Installation Wizard</div>
+                <h3 class="text-2xl font-bold text-white font-[Orbitron]">Review Files: <span id="review-mod-name" class="text-[#888]">...</span></h3>
             </div>
-            <div id="review-mod-type"
-                 class="px-3 py-1 bg-blue-900 text-blue-200 rounded text-xs font-bold uppercase tracking-wider">UNKNOWN
+            <div id="review-mod-type" class="px-4 py-1 bg-[#222] border border-[#ff8128] text-[#ff8128] rounded font-bold text-xs uppercase tracking-widest">
+                UNKNOWN
             </div>
         </div>
 
-        <!-- Content -->
         <div class="flex-1 overflow-hidden flex flex-col md:flex-row">
-            <!-- Левая колонка: Мусор/Неизвестное -->
-            <div id="unmapped-panel"
-                 class="hidden md:w-1/3 w-full border-r border-gray-700 flex flex-col bg-red-900/10">
-                <div class="p-3 bg-red-900/20 text-red-300 font-bold text-sm flex items-center gap-2 border-b border-red-900/30">
-                    <span>⚠️ Пропущенные файлы</span>
+             <!-- Unmapped (Hidden by default in JS, but styled here) -->
+             <div id="unmapped-panel" class="hidden md:w-1/3 border-r border-[#333] bg-[#111] flex flex-col">
+                <div class="p-3 bg-red-900/10 text-red-500 font-bold text-xs uppercase border-b border-red-900/20">
+                    <i class="fas fa-exclamation-triangle mr-2"></i> Ignored Files
                 </div>
-                <div id="unmapped-list"
-                     class="flex-1 overflow-auto p-3 text-xs text-red-200/70 space-y-1 custom-scrollbar"></div>
+                <div id="unmapped-list" class="flex-1 overflow-auto p-4 text-xs font-mono text-red-400/60 space-y-1"></div>
             </div>
 
-            <!-- Правая колонка: Файлы для установки -->
-            <div class="flex-1 flex flex-col bg-gray-800">
-                <div class="p-3 bg-green-900/20 text-green-300 font-bold text-sm border-b border-green-900/30">
-                    <span>✅ Файлы для установки (Симлинки)</span>
+            <!-- Mapped -->
+            <div class="flex-1 flex flex-col bg-[#1a1a1a]">
+                <div class="p-3 bg-[#111] text-[#22c55e] font-bold text-xs uppercase border-b border-[#333] flex justify-between">
+                    <span><i class="fas fa-check-circle mr-2"></i> Files to Install (Symlinks)</span>
                 </div>
-                <div id="mapped-list" class="flex-1 overflow-auto p-0 text-xs custom-scrollbar">
-                    <!-- Table header -->
-                    <div class="flex bg-gray-900/50 p-2 text-gray-500 border-b border-gray-700">
-                        <div class="w-1/2">Исходный файл (в моде)</div>
-                        <div class="w-1/2">Путь в игре</div>
-                    </div>
-                    <div id="mapped-rows" class="divide-y divide-gray-700/50"></div>
+                <div id="mapped-list" class="flex-1 overflow-auto bg-[#0f0f0f]">
+                    <div id="mapped-rows" class="divide-y divide-[#222]"></div>
                 </div>
             </div>
         </div>
 
-        <!-- Footer -->
-        <div class="p-4 border-t border-gray-700 bg-gray-900 flex justify-end gap-3">
-            <button id="btn-cancel-import"
-                    class="btn-secondary bg-red-900/20 border-red-900/50 hover:bg-red-900/40 text-red-200">Отмена
-            </button>
-            <button id="btn-confirm-import" class="btn-primary bg-green-700 hover:bg-green-600">Подтвердить установку
-            </button>
+        <div class="p-5 border-t border-[#333] bg-[#151515] flex justify-end gap-4">
+            <button id="btn-cancel-import" class="btn btn-danger px-6">CANCEL</button>
+            <button id="btn-confirm-import" class="btn btn-primary px-8">CONFIRM INSTALLATION</button>
         </div>
     </div>
 </div>
 
 <!-- Load Order Modal -->
-<div id="load-order-modal"
-     class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
-    <div class="bg-gray-800 w-[600px] h-[80%] flex flex-col rounded-xl shadow-2xl border border-gray-600">
-        <div class="p-4 border-b border-gray-700 bg-gray-900">
-            <h3 class="text-lg font-bold text-white">Порядок загрузки</h3>
-            <p class="text-xs text-gray-400">Верхние моды перезаписывают нижние. Перетащите для изменения.</p>
+<div id="load-order-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center">
+    <div class="bg-[#1a1a1a] w-[600px] h-[80%] flex flex-col rounded-xl shadow-2xl border border-[#333]">
+        <div class="p-5 border-b border-[#333] bg-[#151515]">
+            <h3 class="text-xl font-bold text-white font-[Orbitron]"><i class="fas fa-sort text-[#ff8128] mr-2"></i> LOAD ORDER</h3>
+            <p class="text-xs text-[#888] mt-1">Drag and drop functionality coming soon. Use arrows.</p>
         </div>
-
-        <div class="flex-1 overflow-auto p-4 custom-scrollbar bg-gray-900/50" id="load-order-list">
-            <!-- JS заполнит список -->
-        </div>
-
-        <div class="p-4 border-t border-gray-700 bg-gray-900 flex justify-between">
-            <button onclick="document.getElementById('load-order-modal').classList.add('hidden')" class="btn-secondary">
-                Закрыть
-            </button>
-            <button id="btn-save-order" class="btn-primary">Применить порядок</button>
+        <div class="flex-1 overflow-auto p-4 bg-[#0d0d0d]" id="load-order-list"></div>
+        <div class="p-5 border-t border-[#333] bg-[#151515] flex justify-between">
+            <button onclick="document.getElementById('load-order-modal').classList.add('hidden')" class="btn btn-secondary">CLOSE</button>
+            <button id="btn-save-order" class="btn btn-primary">APPLY</button>
         </div>
     </div>
 </div>
 
-<!-- HOF MANAGER MODAL -->
-<div id="hof-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center">
-    <div class="bg-gray-800 w-[90%] h-[90%] flex flex-col rounded-xl shadow-2xl border border-purple-900/50">
+<!-- HOF Modal -->
+<div id="hof-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center">
+    <div class="bg-[#1a1a1a] w-[90%] h-[90%] flex flex-col rounded-xl shadow-2xl border border-[#333] relative">
+        <!-- Close Button -->
+        <button onclick="document.getElementById('hof-modal').classList.add('hidden')" class="absolute top-4 right-4 text-[#888] hover:text-white">
+            <i class="fas fa-times text-xl"></i>
+        </button>
 
-        <!-- Header -->
-        <div class="p-4 border-b border-gray-700 bg-gray-900 flex justify-between items-center">
-            <h3 class="text-xl font-bold text-white flex items-center gap-2">
-                <span class="text-purple-400">🚌</span> HOF Инжектор
+        <div class="p-6 border-b border-[#333] bg-[#151515]">
+            <h3 class="text-2xl font-bold text-white font-[Orbitron] flex items-center gap-2">
+                <span class="text-[#ff8128]">HOF</span> INJECTOR
             </h3>
-            <div class="space-x-2">
-                <button id="btn-scan-game-hof" class="text-xs btn-secondary border-purple-500/50 text-purple-200">🔍 Найти HOF в игре</button>
-                <button onclick="document.getElementById('hof-modal').classList.add('hidden')" class="text-gray-400 hover:text-white">✕</button>
-            </div>
         </div>
 
-        <!-- Columns -->
         <div class="flex-1 flex overflow-hidden">
-
-            <!-- Left: Library HOFs -->
-            <div class="w-1/2 border-r border-gray-700 flex flex-col p-4 bg-gray-800/50">
-                <div class="flex justify-between items-center mb-2">
-                    <h4 class="font-bold text-gray-300">1. Выберите HOF файлы</h4>
-                    <span id="hof-count" class="text-xs text-gray-500">0 шт.</span>
+            <!-- Left -->
+            <div class="w-1/2 border-r border-[#333] flex flex-col p-4 bg-[#111]">
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="font-bold text-[#e0e0e0] uppercase text-xs tracking-wider">1. Select HOF File</h4>
+                    <span id="hof-count" class="text-xs text-[#ff8128] font-mono">0</span>
                 </div>
-                <!-- Search -->
-                <input type="text" id="hof-search" placeholder="Поиск..."
-                       class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm mb-2 text-white">
-
-                <div id="hof-list-container" class="flex-1 overflow-y-auto custom-scrollbar space-y-1">
-                    <!-- JS fills this -->
-                </div>
+                <input type="text" id="hof-search" placeholder="Search HOF..." class="w-full bg-[#0d0d0d] border border-[#333] rounded p-2 text-xs text-white mb-3 focus:border-[#ff8128] outline-none">
+                <div id="hof-list-container" class="flex-1 overflow-y-auto space-y-1 pr-2"></div>
             </div>
 
-            <!-- Right: Buses -->
-            <div class="w-1/2 flex flex-col p-4 bg-gray-900/30">
-                <div class="flex justify-between items-center mb-2">
-                    <h4 class="font-bold text-gray-300">2. Выберите Автобусы</h4>
-                    <button id="btn-select-all-buses" class="text-xs text-blue-400 hover:underline">Выбрать все</button>
+            <!-- Right -->
+            <div class="w-1/2 flex flex-col p-4 bg-[#161616]">
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="font-bold text-[#e0e0e0] uppercase text-xs tracking-wider">2. Select Buses</h4>
+                    <button id="btn-select-all-buses" class="text-xs text-[#ff8128] hover:underline">Select All</button>
                 </div>
-                <!-- Search -->
-                <input type="text" id="bus-search" placeholder="Поиск автобуса..."
-                       class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm mb-2 text-white">
-
-                <div id="bus-list-container" class="flex-1 overflow-y-auto custom-scrollbar space-y-1">
-                    <!-- JS fills this -->
-                </div>
+                <input type="text" id="bus-search" placeholder="Search Bus..." class="w-full bg-[#0d0d0d] border border-[#333] rounded p-2 text-xs text-white mb-3 focus:border-[#ff8128] outline-none">
+                <div id="bus-list-container" class="flex-1 overflow-y-auto space-y-1 pr-2"></div>
             </div>
         </div>
 
-        <!-- Footer -->
-        <div class="p-4 border-t border-gray-700 bg-gray-900 flex justify-between">
-            <!-- НОВАЯ КНОПКА СЛЕВА -->
-            <button id="btn-uninstall-hofs" class="px-4 py-2 border border-red-800 text-red-400 hover:bg-red-900/30 rounded text-sm transition">
-                🗑 Отключить все HOF (Вернуть как было)
-            </button>
-
-            <button id="btn-install-hofs" class="btn-primary bg-purple-600 hover:bg-purple-500 font-bold px-8">
-                Установить выбранное
-            </button>
+        <div class="p-5 border-t border-[#333] bg-[#151515] flex justify-between items-center">
+            <div class="flex gap-2">
+                <button id="btn-scan-game-hof" class="btn btn-secondary text-xs"><i class="fas fa-search mr-1"></i> Scan Game for HOFs</button>
+                <button id="btn-uninstall-hofs" class="text-xs text-[#888] hover:text-red-500 transition px-3">Reset All HOFs</button>
+            </div>
+            <button id="btn-install-hofs" class="btn btn-primary px-8">INJECT HOF FILES</button>
         </div>
     </div>
 </div>
 
-<!-- GAME SCAN RESULT MODAL (Маленькое окно подтверждения импорта) -->
-<div id="hof-import-modal" class="hidden fixed inset-0 bg-black/80 z-[60] flex items-center justify-center">
-    <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-600 w-[500px]">
-        <h3 class="text-lg font-bold mb-4">Найдены новые HOF в игре</h3>
-        <p class="text-sm text-gray-400 mb-4">Найдено <span id="found-hof-count" class="text-white font-bold">0</span>
-            уникальных файлов. Добавить их в библиотеку менеджера?</p>
-
-        <div id="found-hof-list"
-             class="h-32 overflow-y-auto bg-gray-900 p-2 text-xs font-mono text-gray-300 mb-4 custom-scrollbar"></div>
-
-        <div class="flex justify-end gap-2">
-            <button onclick="document.getElementById('hof-import-modal').classList.add('hidden')" class="btn-secondary">
-                Отмена
-            </button>
-            <button id="btn-confirm-hof-import" class="btn-primary">Импортировать</button>
+<!-- Import Modal (Mini) -->
+<div id="hof-import-modal" class="hidden fixed inset-0 bg-black/90 z-[60] flex items-center justify-center">
+    <div class="bg-[#1a1a1a] p-6 rounded-lg border border-[#ff8128] w-[500px] shadow-[0_0_30px_rgba(255,129,40,0.2)]">
+        <h3 class="text-lg font-bold mb-4 text-white">Import from Game?</h3>
+        <p class="text-sm text-[#888] mb-4">Found <span id="found-hof-count" class="text-[#ff8128] font-bold">0</span> unique HOF files in your game folder.</p>
+        <div id="found-hof-list" class="h-32 overflow-y-auto bg-black p-2 text-xs font-mono text-gray-300 mb-4 border border-[#333]"></div>
+        <div class="flex justify-end gap-3">
+            <button onclick="document.getElementById('hof-import-modal').classList.add('hidden')" class="btn btn-secondary">Discard</button>
+            <button id="btn-confirm-hof-import" class="btn btn-primary">Import to Library</button>
         </div>
     </div>
 </div>
 
 <!-- Loading Overlay -->
-<div id="loading-modal"
-     class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center">
-    <div class="bg-gray-800 p-8 rounded shadow-xl text-center w-1/3 border border-gray-700">
-        <h3 id="loading-title" class="text-xl font-bold text-white mb-4">Обработка мода...</h3>
-        <div class="w-full bg-gray-700 rounded-full h-2.5">
-            <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
-        </div>
-        <p id="progress-text" class="text-gray-400 mt-2 text-sm">Инициализация...</p>
+<div id="loading-modal" class="hidden fixed inset-0 bg-black/95 backdrop-blur-sm z-[70] flex flex-col items-center justify-center">
+    <div class="text-[#ff8128] text-4xl mb-4 animate-bounce"><i class="fas fa-cog fa-spin"></i></div>
+    <h3 id="loading-title" class="text-xl font-bold text-white mb-2 font-[Orbitron]">PROCESSING</h3>
+    <div class="w-64 bg-[#333] rounded-full h-1 mt-2 overflow-hidden">
+        <div id="progress-bar" class="bg-[#ff8128] h-full transition-all duration-300" style="width: 0%"></div>
     </div>
+    <p id="progress-text" class="text-[#666] mt-2 text-xs font-mono">Please wait...</p>
 </div>
 
 <!-- Scripts -->
