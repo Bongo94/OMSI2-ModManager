@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 import time
 import subprocess
 import re
@@ -15,9 +16,16 @@ class ModImporter:
         self.session = config_manager.session
         self.logger = logger
 
-        # Теперь используем полнофункциональный 7z.exe (требует 7z.dll рядом)
-        base_dir = os.getcwd()
-        self.seven_zip_tool = os.path.join(base_dir, "7Zip\\7z.exe")
+        # Логика определения пути (дублируем, чтобы не делать лишних импортов)
+        if getattr(sys, 'frozen', False):
+            # Если запущено как EXE
+            base_dir = sys._MEIPASS
+        else:
+            # Если запущено как скрипт
+            base_dir = os.path.abspath(".")
+
+        # Указываем путь к exe внутри папки 7Zip
+        self.seven_zip_tool = os.path.join(base_dir, "7Zip", "7z.exe")
 
     def _progress_callback(self, percent, text=None):
         self.logger.log(text, level="progress", progress=percent)

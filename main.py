@@ -1,11 +1,24 @@
 import json
 import os
+import sys
 import webview
 from core.config import ConfigManager
 from core.database import Mod, GameProfile
 from core.hof_tools import HofTools
 from core.importer import ModImporter
 from core.installer import ModInstaller
+
+
+# Функция для поиска ресурсов внутри EXE
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller создает временную папку _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 
 class UILogger:
@@ -279,8 +292,7 @@ class Api:
 if __name__ == '__main__':
     api = Api()
 
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    ui_path = os.path.join(current_dir, 'ui', 'index.html')
+    ui_path = resource_path(os.path.join('ui', 'index.html'))
 
     window = webview.create_window(
         'OMSI 2 Mod Manager',
