@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="static/img/logo.png" alt="OMSI 2 Mod Manager Logo" width="120" height="120">
+  <img src="ui/static/img/logo.png" alt="OMSI 2 Mod Manager Logo" width="120" height="120">
   
   <h1 align="center">OMSI 2 Mod Manager</h1>
 
@@ -28,7 +28,7 @@
 
 <br />
 
-![Application Screenshot](static/img/screenshot.png)
+![Application Screenshot](ui/static/img/screenshot.png)
 
 ---
 
