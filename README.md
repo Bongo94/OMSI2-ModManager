@@ -21,6 +21,12 @@
     <a href="#%EF%B8%8F-installation--build">Installation</a>
   </p>
 
+  <div align="center">
+      <a href="../../releases/latest">
+        <img src="https://img.shields.io/badge/DOWNLOAD-LATEST_VERSION-orange?style=for-the-badge&logo=windows&logoColor=white" alt="Download">
+      </a>
+  </div>
+
   ![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
   ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
   ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
