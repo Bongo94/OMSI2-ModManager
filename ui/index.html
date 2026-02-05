@@ -182,7 +182,9 @@
     </div>
 </main>
 
-<!-- Modals (Обернул тексты в span с data-i18n) -->
+<!-- ================= MODALS ================= -->
+
+<!-- 1. REVIEW MODAL (Импорт мода) -->
 <div id="review-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center">
     <div class="bg-[#1a1a1a] w-[90%] h-[85%] flex flex-col rounded-xl border border-[#333] overflow-hidden">
         <div class="p-6 border-b border-[#333] bg-[#151515] flex justify-between items-center">
@@ -220,6 +222,7 @@
     </div>
 </div>
 
+<!-- 2. HOF MANAGER MODAL (Добавлены поля поиска и ID) -->
 <div id="hof-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center">
     <div class="bg-[#1a1a1a] w-[90%] h-[90%] flex flex-col rounded-xl shadow-2xl border border-[#333] relative">
         <button onclick="document.getElementById('hof-modal').classList.add('hidden')"
@@ -231,14 +234,21 @@
             </h3>
         </div>
         <div class="flex-1 flex overflow-hidden">
+            <!-- Левая колонка: Список HOF -->
             <div class="w-1/2 border-r border-[#333] flex flex-col p-4 bg-[#111]">
                 <div class="flex justify-between items-center mb-3">
                     <h4 class="font-bold text-[#e0e0e0] uppercase text-xs tracking-wider" data-i18n="lbl_select_hof">1.
                         Select HOF</h4>
                     <span id="hof-count" class="text-xs text-[#ff8128] font-mono">0</span>
                 </div>
+                <!-- Поле поиска HOF (Исправляет ошибку JS) -->
+                <input type="text" id="hof-search" placeholder="Search HOF..."
+                       class="w-full bg-[#222] text-xs p-2 rounded mb-2 border border-[#333] focus:border-purple-500 outline-none text-white placeholder-gray-600 transition">
+
                 <div id="hof-list-container" class="flex-1 overflow-y-auto space-y-1 pr-2"></div>
             </div>
+
+            <!-- Правая колонка: Список Автобусов -->
             <div class="w-1/2 flex flex-col p-4 bg-[#161616]">
                 <div class="flex justify-between items-center mb-3">
                     <h4 class="font-bold text-[#e0e0e0] uppercase text-xs tracking-wider" data-i18n="lbl_select_bus">2.
@@ -247,6 +257,10 @@
                             data-i18n="btn_select_all">Select All
                     </button>
                 </div>
+                <!-- Поле поиска Bus (Исправляет ошибку JS) -->
+                <input type="text" id="bus-search" placeholder="Search Bus..."
+                       class="w-full bg-[#222] text-xs p-2 rounded mb-2 border border-[#333] focus:border-blue-500 outline-none text-white placeholder-gray-600 transition">
+
                 <div id="bus-list-container" class="flex-1 overflow-y-auto space-y-1 pr-2"></div>
             </div>
         </div>
@@ -263,6 +277,51 @@
     </div>
 </div>
 
+<!-- 3. HOF IMPORT MODAL (Импорт найденных в игре) -->
+<div id="hof-import-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-[60] flex items-center justify-center">
+    <div class="bg-[#1a1a1a] w-[500px] flex flex-col rounded-xl border border-[#333] overflow-hidden">
+        <div class="p-6 bg-[#151515] border-b border-[#333]">
+            <h3 class="text-xl font-bold text-white" data-i18n="modal_import_title">Import from Game?</h3>
+            <p class="text-gray-500 text-xs mt-1" data-i18n="modal_import_desc">Found unique HOF files.</p>
+        </div>
+        <div class="p-4 bg-[#111] max-h-[300px] overflow-y-auto">
+            <div class="flex justify-between text-xs font-bold text-gray-500 mb-2">
+                <span>FILE</span> <span id="found-hof-count">0</span>
+            </div>
+            <div id="found-hof-list" class="space-y-1 text-sm text-gray-300 font-mono"></div>
+        </div>
+        <div class="p-4 bg-[#151515] border-t border-[#333] flex justify-end gap-3">
+            <button onclick="document.getElementById('hof-import-modal').classList.add('hidden')"
+                    class="btn btn-secondary text-xs" data-i18n="btn_discard">Discard</button>
+            <button id="btn-confirm-hof-import" class="btn btn-primary text-xs" data-i18n="btn_import">Import</button>
+        </div>
+    </div>
+</div>
+
+<!-- 4. LOAD ORDER MODAL (ИСПРАВЛЯЕТ ОШИБКУ view.js:198) -->
+<div id="load-order-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center">
+    <div class="bg-[#1a1a1a] w-[600px] h-[80%] flex flex-col rounded-xl border border-[#333] relative">
+        <button onclick="document.getElementById('load-order-modal').classList.add('hidden')"
+                class="absolute top-4 right-4 text-[#888] hover:text-white">
+            <i class="fas fa-times text-xl"></i>
+        </button>
+        <div class="p-6 border-b border-[#333] bg-[#151515]">
+            <h3 class="text-2xl font-bold text-white font-[Orbitron]">
+                LOAD <span class="text-[#ff8128]">ORDER</span>
+            </h3>
+            <p class="text-xs text-[#888] mt-1">Drag (or use arrows) to resolve conflicts. Higher = Winner.</p>
+        </div>
+        <!-- Вот этот ID искал скрипт -->
+        <div id="load-order-list" class="flex-1 overflow-y-auto p-4 space-y-2 bg-[#0d0d0d]">
+            <!-- Сюда JS вставляет список конфликтов -->
+        </div>
+        <div class="p-5 border-t border-[#333] bg-[#151515] flex justify-end">
+            <button id="btn-save-order" class="btn btn-primary px-8">SAVE ORDER</button>
+        </div>
+    </div>
+</div>
+
+<!-- 5. LOADING MODAL -->
 <div id="loading-modal"
      class="hidden fixed inset-0 bg-black/95 backdrop-blur-sm z-[70] flex flex-col items-center justify-center">
     <div class="text-[#ff8128] text-4xl mb-4 animate-bounce"><i class="fas fa-cog fa-spin"></i></div>

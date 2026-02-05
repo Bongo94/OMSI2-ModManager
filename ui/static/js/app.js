@@ -275,12 +275,23 @@ document.getElementById('btn-save-order').onclick = async () => {
 let foundHofsCache = []; // Для хранения результата сканирования
 
 document.getElementById('btn-hof-manager').onclick = async () => {
-    View.setLoading(true, "Загрузка списка автобусов...");
-    const data = await pywebview.api.get_hof_data();
-    View.setLoading(false);
+    try {
+        View.setLoading(true, "Загрузка списка автобусов...");
+        // Вызов Python
+        const data = await pywebview.api.get_hof_data();
+        View.setLoading(false);
 
-    renderHofManager(data);
-    document.getElementById('hof-modal').classList.remove('hidden');
+        // Отрисовка
+        renderHofManager(data);
+
+        // Показ окна
+        document.getElementById('hof-modal').classList.remove('hidden');
+    } catch (error) {
+        View.setLoading(false);
+        console.error(error);
+        alert("Ошибка при открытии HOF менеджера:\n" + error);
+        View.addLog("Error opening HOF manager: " + error, "error");
+    }
 };
 
 function renderHofManager(data) {

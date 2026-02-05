@@ -2,9 +2,7 @@ import os
 import shutil
 import hashlib
 from pathlib import Path
-
 from sqlalchemy import func
-
 from core.database import HofFile, HofInstall, Mod
 from core.installer import ModInstaller
 
@@ -14,20 +12,23 @@ class HofTools:
         self.config = config_manager
         self.session = config_manager.session
         self.logger = logger
-        self.game_root = Path(self.config.game_path)
-        self.vehicles_path = self.game_root / "Vehicles"
 
-        # Используем логику инсталлятора для симлинков и бэкапов
+        # Защита от отсутствия пути при первом запуске
+        if self.config.game_path:
+            self.game_root = Path(self.config.game_path)
+            self.vehicles_path = self.game_root / "Vehicles"
+        else:
+            self.game_root = None
+            self.vehicles_path = None
+
         self.installer = ModInstaller(config_manager, logger)
 
         self.hof_lib_path = Path(self.config.library_path) / "HOF_Storage"
         self.hof_lib_path.mkdir(parents=True, exist_ok=True)
 
     def get_library_hofs(self):
-        """
-        Возвращает список уникальных HOF-файлов с информацией о моде-источнике.
-        """
-        # 1. Сначала находим максимальные ID для уникальных имен (как в прошлом шаге)
+        """Возвращает список уникальных HOF-файлов с информацией о моде-источнике."""
+        # 1. Находим максимальные ID для уникальных имен
         subquery = (
             self.session.query(
                 HofFile.filename,
@@ -37,8 +38,7 @@ class HofTools:
             .subquery()
         )
 
-        # 2. Делаем основной запрос с JOIN к таблице Mod
-        # Используем outerjoin, так как у HOF, импортированных из игры, mod_id может быть None
+        # 2. Основной запрос
         results = (
             self.session.query(HofFile, Mod.name)
             .join(subquery, HofFile.id == subquery.c.max_id)
@@ -58,118 +58,74 @@ class HofTools:
 
         return hof_data
 
-    def scan_existing_game_hofs(self):
-        """
-        Ищет HOF в игре, которых НЕТ в библиотеке по имени файла.
-        """
-        found_hofs = {}  # name -> full_path
-
-        if not self.vehicles_path.exists():
-            return []
-
-        # 1. Сканируем папку Vehicles
-        for root, _, files in os.walk(self.vehicles_path):
-            for file in files:
-                if file.lower().endswith('.hof'):
-                    # Оставляем только один экземпляр каждого имени при сканировании
-                    if file not in found_hofs:
-                        found_hofs[file] = os.path.join(root, file)
-
-        # 2. Получаем все имена, которые УЖЕ есть в базе
-        existing_names = {
-            h.filename for h in self.session.query(HofFile.filename).all()
-        }
-
-        # 3. Оставляем только те, которых в базе нет совсем
-        unique_new = []
-        for name, path in found_hofs.items():
-            if name not in existing_names:
-                unique_new.append({"name": name, "path": path})
-
-        return unique_new
-
     def scan_for_buses(self):
-        """
-        Сканирует папку Vehicles и возвращает ТОЛЬКО играбельный транспорт.
-        """
+        """Сканирует папку Vehicles и возвращает ТОЛЬКО играбельный транспорт."""
         buses = []
-        if not self.vehicles_path.exists():
+        if not self.vehicles_path or not self.vehicles_path.exists():
             return []
 
-        for entry in sorted(os.scandir(self.vehicles_path), key=lambda e: e.name.lower()):
+        try:
+            entries = sorted(os.scandir(self.vehicles_path), key=lambda e: e.name.lower())
+        except OSError:
+            return []
+
+        for entry in entries:
             if not entry.is_dir(): continue
 
             bus_folder_path = Path(entry.path)
-            # Ищем все файлы конфигурации
+            # Ищем файлы конфигурации
             bus_files = list(bus_folder_path.glob("*.bus")) + list(bus_folder_path.glob("*.ovh"))
 
             if not bus_files: continue
 
             folder_display_name = None
             is_folder_playable = False
+            vehicle_type = 'bus'  # bus or car
 
             for b_file in bus_files:
                 analysis = self._analyze_is_playable(b_file)
 
                 if analysis['playable']:
                     is_folder_playable = True
-                    # Если нашли красивое имя в игровом файле - запоминаем его
                     if analysis['name']:
                         folder_display_name = analysis['name']
-                    break  # Если хоть один файл в папке играбельный - папка нам подходит
+                    if b_file.suffix == '.ovh':
+                        vehicle_type = 'car'
+                    break
 
-            # ВАЖНО: Добавляем в список ТОЛЬКО если папка прошла проверку
             if is_folder_playable:
                 buses.append({
                     "folder": entry.name,
-                    "name": folder_display_name if folder_display_name else entry.name
+                    "name": folder_display_name if folder_display_name else entry.name,
+                    "type": vehicle_type
                 })
 
         return buses
 
     def _analyze_is_playable(self, file_path):
-        """
-        Жесткая проверка файла. Трафик не пройдет.
-        """
+        """Жесткая проверка файла. Трафик не пройдет."""
         res = {'playable': False, 'name': None}
-
         try:
-            # Читаем файл (OMSI использует latin-1)
             with open(file_path, 'r', encoding='latin-1', errors='replace') as f:
                 content = f.read()
 
-            # 1. Базовая проверка: есть ли вообще имя для меню?
             if "[friendlyname]" not in content:
                 return res
 
-            # 2. Проверка на AI-пути (самый частый признак трафика)
-            # Если скрипты или звуки лежат в папках AI_Cars / AI_Buses - это мусор
             content_lower = content.lower()
             if "ai_cars" in content_lower or "ai_buses" in content_lower:
                 return res
 
-            # 3. Проверка сложности систем (Скрипты)
-            # У игрока всегда есть: кабина, двигатель, электроника, коробка передач
-            # У трафика обычно 1-3 скрипта (main_AI.osc и пара варлистов)
             has_systems = False
-            # Ищем ключевые слова в именах файлов скриптов
             playable_keywords = ['antrieb.osc', 'engine.osc', 'elec.osc', 'cockpit.osc', 'ibis.osc', 'matrix.osc']
             if any(key in content_lower for key in playable_keywords):
                 has_systems = True
 
-            # 4. Наличие кабины пассажиров (тег [passengercabin])
-            # Почти 100% признак того, что это автобус для игрока
             has_cabin = "[passengercabin]" in content_lower
-
-            # 5. Наличие зеркал/отдельных камер (тег [add_camera_reflexion])
             has_mirrors = "add_camera_reflexion" in content_lower
 
-            # ИТОГОВОЕ РЕШЕНИЕ:
-            # Мы считаем транспорт играбельным, если есть friendlyname И (Сложные скрипты ИЛИ Кабина ИЛИ Зеркала)
             if has_systems or has_cabin or has_mirrors:
                 res['playable'] = True
-
-                # Попутно вытащим имя для красоты
                 lines = content.splitlines()
                 for i, line in enumerate(lines):
                     if line.strip().lower() == "[friendlyname]":
@@ -181,64 +137,14 @@ class HofTools:
                         except:
                             pass
                         break
-
             return res
-
         except:
             return res
 
-    def _parse_bus_info(self, file_path):
-        """
-        Читает файл и ищет секцию [friendlyname].
-        Возвращает dict {'manuf': ..., 'model': ...} или None, если секции нет.
-        """
-        try:
-            # OMSI файлы часто в кодировке latin-1 (или windows-1252), utf-8 редко
-            with open(file_path, 'r', encoding='latin-1', errors='replace') as f:
-                content = f.read().splitlines()
-
-            for i, line in enumerate(content):
-                clean_line = line.strip()
-
-                # Ищем ключевое слово
-                if clean_line.lower() == "[friendlyname]":
-                    # Секция найдена! Это играбельный автобус.
-                    # Следующие строки:
-                    # 1. Производитель
-                    # 2. Модель
-                    # 3. Окраска (нам не нужна)
-
-                    manufacturer = ""
-                    model = ""
-
-                    # Пытаемся прочитать следующие непустые строки
-                    offset = 1
-                    found_lines = []
-                    while i + offset < len(content) and len(found_lines) < 2:
-                        val = content[i + offset].strip()
-                        if val and not val.startswith('[') and not val.startswith(
-                                '\t'):  # Игнорируем другие теги или пустые
-                            found_lines.append(val)
-                        offset += 1
-
-                    if len(found_lines) >= 1: manufacturer = found_lines[0]
-                    if len(found_lines) >= 2: model = found_lines[1]
-
-                    return {"manuf": manufacturer, "model": model}
-
-            return None  # Тег не найден -> вероятно трафик или мусор
-
-        except Exception:
-            return None
-
     def scan_existing_game_hofs(self):
-        """
-        Ищет HOF файлы уже установленные в игре, которых нет в библиотеке.
-        Возвращает список уникальных найденных файлов.
-        """
-        found_hofs = {}  # name -> full_path
-
-        if not self.vehicles_path.exists():
+        """Ищет HOF файлы уже установленные в игре, которых нет в библиотеке."""
+        found_hofs = {}
+        if not self.vehicles_path or not self.vehicles_path.exists():
             return []
 
         self.logger.log("Сканирование папки Vehicles на наличие HOF...", "info")
@@ -246,12 +152,9 @@ class HofTools:
         for root, _, files in os.walk(self.vehicles_path):
             for file in files:
                 if file.lower().endswith('.hof'):
-                    # Если файл уже есть в найденных, пропускаем (предполагаем дубликаты одинаковыми по имени)
-                    # Можно добавить проверку хеша, но это долго.
                     if file not in found_hofs:
                         found_hofs[file] = os.path.join(root, file)
 
-        # Фильтруем те, что уже есть в БД
         existing_names = {h.filename for h in self.session.query(HofFile).all()}
         unique_new = []
 
@@ -268,18 +171,14 @@ class HofTools:
             src = Path(item['path'])
             target = self.hof_lib_path / item['name']
 
-            # Если файл с таким именем есть, добавляем таймштамп
             if target.exists():
                 continue
 
             try:
                 shutil.copy2(src, target)
-
-                # Создаем запись в БД
-                # Пробуем прочитать описание (первая строка файла)
                 desc = "Imported from Game"
                 try:
-                    with open(target, 'r', encoding='latin-1') as f:  # OMSI обычно latin-1
+                    with open(target, 'r', encoding='latin-1') as f:
                         line = f.readline().strip()
                         if line and "[name]" not in line:
                             desc = line[:50]
@@ -288,9 +187,9 @@ class HofTools:
 
                 new_hof = HofFile(
                     filename=item['name'],
-                    full_source_path=str(target),  # Абсолютный путь, или относительный к Lib
+                    full_source_path=str(target),
                     description=desc,
-                    mod_id=None  # Это глобальный HOF, не привязан к моду
+                    mod_id=None
                 )
                 self.session.add(new_hof)
                 imported_count += 1
@@ -301,37 +200,34 @@ class HofTools:
         return imported_count
 
     def install_hofs_to_buses(self, hof_ids, bus_folder_names):
-        """
-        Устанавливает HOF файлы через СИМЛИНКИ.
-        Если в папке есть оригинальный файл - делает бэкап.
-        """
+        """Устанавливает HOF файлы через СИМЛИНКИ."""
         hofs = self.session.query(HofFile).filter(HofFile.id.in_(hof_ids)).all()
+        if not hofs: return False, "No HOFs selected"
 
         total_ops = len(hofs) * len(bus_folder_names)
         current = 0
         errors = []
 
-        self.logger.log(f"Инъекция {len(hofs)} HOF в {len(bus_folder_names)} автобусов (Symlinks)...", "info")
+        self.logger.log(f"Инъекция {len(hofs)} HOF в {len(bus_folder_names)} автобусов...", "info")
 
         for bus_name in bus_folder_names:
             bus_path_rel = Path("Vehicles") / bus_name
 
-            # Проверка, что папка существует
-            if not (self.game_root / bus_path_rel).exists():
+            # Полный путь к папке автобуса
+            bus_full_path = self.game_root / bus_path_rel
+            if not bus_full_path.exists():
                 continue
 
             for hof in hofs:
                 current += 1
 
-                # 1. Находим исходный файл в библиотеке
+                # Поиск исходника
                 src_candidate = Path(hof.full_source_path)
                 if not src_candidate.is_absolute():
-                    # Пробуем найти в HOF хранилище
                     temp = self.hof_lib_path / hof.filename
                     if temp.exists():
                         src_candidate = temp
                     else:
-                        # Пробуем найти внутри мода
                         temp = Path(self.config.library_path) / "Mods" / src_candidate
                         src_candidate = temp
 
@@ -339,16 +235,11 @@ class HofTools:
                     errors.append(f"Missing source: {hof.filename}")
                     continue
 
-                # 2. Определяем целевой путь
                 target_rel_path = bus_path_rel / hof.filename
 
                 try:
-                    # 3. Используем метод инсталлятора для безопасной установки (Симлинк + Бэкап)
-                    # _install_file_physically возвращает (backup_path, original_hash)
-                    # Она сама переместит оригинал в Backups, если он там был.
                     backup, _ = self.installer._install_file_physically(target_rel_path, src_candidate)
 
-                    # 4. Записываем в БД
                     install_record = HofInstall(
                         hof_file_id=hof.id,
                         bus_folder_name=bus_name,
@@ -370,42 +261,33 @@ class HofTools:
         return True, "HOF файлы успешно привязаны (симлинки)!"
 
     def uninstall_all_hofs(self):
-        """
-        Удаляет ВСЕ установленные через менеджер HOF файлы и восстанавливает оригиналы.
-        """
+        """Удаляет ВСЕ установленные HOF файлы и восстанавливает оригиналы."""
         installs = self.session.query(HofInstall).all()
         if not installs:
             return True, "Нет установленных HOF файлов."
 
-        self.logger.log(f"Удаление {len(installs)} HOF файлов и восстановление оригиналов...", "info")
+        self.logger.log(f"Удаление {len(installs)} HOF файлов...", "info")
 
         count = 0
         for record in installs:
             try:
-                # Формируем объект-пустышку, похожий на InstalledFile,
-                # чтобы скормить его методу _remove_installed_file инсталлятора
-                # (или делаем вручную, так как логика простая)
+                target_full = self.game_root / record.game_rel_path  # Используем правильное поле game_rel_path
 
-                target_full = self.game_root / record.game_path
-
-                # 1. Удаляем симлинк
                 if target_full.is_symlink() or target_full.exists():
                     if target_full.is_dir():
                         shutil.rmtree(target_full)
                     else:
                         target_full.unlink()
 
-                # 2. Восстанавливаем бэкап
                 if record.backup_path:
                     backup = Path(record.backup_path)
                     if backup.exists() and not target_full.exists():
                         shutil.move(str(backup), str(target_full))
 
-                # 3. Удаляем запись
                 self.session.delete(record)
                 count += 1
             except Exception as e:
                 self.logger.log(f"Ошибка отката {record.game_rel_path}: {e}", "warning")
 
         self.session.commit()
-        return True, f"Откачено {count} файлов. Оригиналы восстановлены."
+        return True, f"Откачено {count} файлов."
