@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OMSI 2 Mod Manager</title>
+    <link rel="icon" type="image/png" href="static/img/logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="static/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -11,15 +12,20 @@
 <body class="h-screen flex flex-col overflow-hidden selection:bg-orange-500 selection:text-black">
 
 <!-- HEADER -->
-<header class="h-16 flex items-center justify-between px-6 bg-[#1a1a1a] border-b border-[#333] z-20 shadow-lg">
+<header class="h-16 flex items-center justify-between px-6 bg-[#1a1a1a] border-b border-[#333] z-20 shadow-lg select-none">
+    <!-- Logo area -->
     <div class="flex items-center gap-4">
+        <img src="static/img/logo.png" alt="Logo" class="h-10 w-10 object-contain drop-shadow-[0_0_10px_rgba(255,129,40,0.3)]">
+
         <div class="text-2xl font-black italic tracking-tighter text-white font-[Orbitron]">
             OMSI 2 <span class="text-[#ff8128]">MANAGER</span>
         </div>
-        <div class="h-6 w-px bg-[#333]"></div>
-        <div class="flex flex-col">
-            <span class="text-[10px] text-gray-500 uppercase tracking-widest font-bold" data-i18n="dev_by">Developed by</span>
-            <a href="https://github.com/Bongo94" target="_blank" class="text-xs font-bold text-white hover:text-[#ff8128] transition font-[Orbitron]">
+
+        <div class="h-6 w-px bg-[#333] mx-2"></div>
+
+        <div class="flex flex-col justify-center">
+            <span class="text-[10px] text-gray-500 uppercase tracking-widest font-bold leading-none mb-0.5" data-i18n="dev_by">Developed by</span>
+            <a href="https://github.com/Bongo94" target="_blank" class="text-xs font-bold text-white hover:text-[#ff8128] transition font-[Orbitron] leading-none">
                 BONGO94
             </a>
         </div>
