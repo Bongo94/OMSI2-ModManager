@@ -12,10 +12,11 @@
 <body class="h-screen flex flex-col overflow-hidden selection:bg-orange-500 selection:text-black">
 
 <!-- HEADER -->
-<header class="h-16 flex items-center justify-between px-6 bg-[#1a1a1a] border-b border-[#333] z-20 shadow-lg select-none">
+<header class="h-16 flex items-center justify-between px-6 bg-[#1a1a1a] border-b border-[#333] z-20 shadow-lg">
     <!-- Logo area -->
     <div class="flex items-center gap-4">
-        <img src="static/img/logo.png" alt="Logo" class="h-10 w-10 object-contain drop-shadow-[0_0_10px_rgba(255,129,40,0.3)]">
+        <img src="static/img/logo.png" alt="Logo"
+             class="h-10 w-10 object-contain drop-shadow-[0_0_10px_rgba(255,129,40,0.3)]">
 
         <div class="text-2xl font-black italic tracking-tighter text-white font-[Orbitron]">
             OMSI 2 <span class="text-[#ff8128]">MANAGER</span>
@@ -24,8 +25,10 @@
         <div class="h-6 w-px bg-[#333] mx-2"></div>
 
         <div class="flex flex-col justify-center">
-            <span class="text-[10px] text-gray-500 uppercase tracking-widest font-bold leading-none mb-0.5" data-i18n="dev_by">Developed by</span>
-            <a href="https://github.com/Bongo94" target="_blank" class="text-xs font-bold text-white hover:text-[#ff8128] transition font-[Orbitron] leading-none">
+            <span class="text-[10px] text-gray-500 uppercase tracking-widest font-bold leading-none mb-0.5"
+                  data-i18n="dev_by">Developed by</span>
+            <a href="https://github.com/Bongo94" target="_blank"
+               class="text-xs font-bold text-white hover:text-[#ff8128] transition font-[Orbitron] leading-none">
                 BONGO94
             </a>
         </div>
@@ -34,8 +37,14 @@
     <div class="flex items-center gap-4">
         <!-- Lang Switcher (Header) -->
         <div class="flex bg-[#0d0d0d] rounded border border-[#333] overflow-hidden">
-            <button onclick="changeLang('en')" class="px-2 py-1 text-[10px] font-bold hover:bg-[#333] transition text-[#888] lang-btn" data-lang="en">EN</button>
-            <button onclick="changeLang('ru')" class="px-2 py-1 text-[10px] font-bold hover:bg-[#333] transition text-[#888] lang-btn" data-lang="ru">RU</button>
+            <button onclick="changeLang('en')"
+                    class="px-2 py-1 text-[10px] font-bold hover:bg-[#333] transition text-[#888] lang-btn"
+                    data-lang="en">EN
+            </button>
+            <button onclick="changeLang('ru')"
+                    class="px-2 py-1 text-[10px] font-bold hover:bg-[#333] transition text-[#888] lang-btn"
+                    data-lang="ru">RU
+            </button>
         </div>
 
         <div class="hidden md:flex flex-col items-end mr-4">
@@ -43,7 +52,8 @@
             <div id="status-bar" class="text-xs text-[#888] font-mono max-w-[200px] truncate">Connecting...</div>
         </div>
 
-        <a href="https://github.com/Bongo94/OMSI2-ModManager" target="_blank" class="text-[#888] hover:text-white transition text-xl">
+        <a href="https://github.com/Bongo94/OMSI2-ModManager" target="_blank"
+           class="text-[#888] hover:text-white transition text-xl">
             <i class="fab fa-github"></i>
         </a>
 
@@ -60,9 +70,15 @@
         <div class="glass-panel p-10 rounded-xl w-full max-w-lg border-t-4 border-[#ff8128]">
             <!-- Lang Switcher (Setup) -->
             <div class="flex justify-center mb-6">
-                 <div class="flex bg-[#0d0d0d] rounded border border-[#333] overflow-hidden p-1 gap-1">
-                    <button onclick="changeLang('en')" class="px-4 py-1 text-xs font-bold rounded transition text-[#888] hover:text-white lang-btn" data-lang="en">ENGLISH</button>
-                    <button onclick="changeLang('ru')" class="px-4 py-1 text-xs font-bold rounded transition text-[#888] hover:text-white lang-btn" data-lang="ru">РУССКИЙ</button>
+                <div class="flex bg-[#0d0d0d] rounded border border-[#333] overflow-hidden p-1 gap-1">
+                    <button onclick="changeLang('en')"
+                            class="px-4 py-1 text-xs font-bold rounded transition text-[#888] hover:text-white lang-btn"
+                            data-lang="en">ENGLISH
+                    </button>
+                    <button onclick="changeLang('ru')"
+                            class="px-4 py-1 text-xs font-bold rounded transition text-[#888] hover:text-white lang-btn"
+                            data-lang="ru">РУССКИЙ
+                    </button>
                 </div>
             </div>
 
@@ -71,18 +87,26 @@
 
             <div class="space-y-6">
                 <div>
-                    <label class="block text-xs uppercase font-bold text-[#ff8128] mb-2 tracking-wider" data-i18n="lbl_game_path">OMSI 2 Root Directory</label>
+                    <label class="block text-xs uppercase font-bold text-[#ff8128] mb-2 tracking-wider"
+                           data-i18n="lbl_game_path">OMSI 2 Root Directory</label>
                     <div class="flex gap-2">
-                        <input type="text" id="game-path-input" class="flex-1 bg-black border border-[#333] rounded p-3 text-sm text-white focus:border-[#ff8128] outline-none transition" readonly placeholder="...">
-                        <button id="btn-browse-game" class="btn btn-secondary px-4"><i class="fas fa-search"></i></button>
+                        <input type="text" id="game-path-input"
+                               class="flex-1 bg-black border border-[#333] rounded p-3 text-sm text-white focus:border-[#ff8128] outline-none transition"
+                               readonly placeholder="...">
+                        <button id="btn-browse-game" class="btn btn-secondary px-4"><i class="fas fa-search"></i>
+                        </button>
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-xs uppercase font-bold text-[#ff8128] mb-2 tracking-wider" data-i18n="lbl_lib_path">Mod Library Storage</label>
+                    <label class="block text-xs uppercase font-bold text-[#ff8128] mb-2 tracking-wider"
+                           data-i18n="lbl_lib_path">Mod Library Storage</label>
                     <div class="flex gap-2">
-                        <input type="text" id="lib-path-input" class="flex-1 bg-black border border-[#333] rounded p-3 text-sm text-white focus:border-[#ff8128] outline-none transition" readonly placeholder="...">
-                        <button id="btn-browse-lib" class="btn btn-secondary px-4"><i class="fas fa-search"></i></button>
+                        <input type="text" id="lib-path-input"
+                               class="flex-1 bg-black border border-[#333] rounded p-3 text-sm text-white focus:border-[#ff8128] outline-none transition"
+                               readonly placeholder="...">
+                        <button id="btn-browse-lib" class="btn btn-secondary px-4"><i class="fas fa-search"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -138,13 +162,23 @@
         </div>
     </div>
 
-    <!-- TERMINAL -->
-    <div class="h-32 bg-[#050505] border-t border-[#333] flex flex-col font-mono">
-        <div class="px-4 py-1 bg-[#111] border-b border-[#222] flex justify-between items-center text-[10px] text-[#555]">
+    <!-- TERMINAL / LOGS -->
+    <div class="h-40 bg-[#050505] border-t border-[#333] flex flex-col font-mono">
+        <div class="px-4 py-1 bg-[#111] border-b border-[#222] flex justify-between items-center text-[10px]">
             <span class="font-bold text-[#ff8128]">SYSTEM TERMINAL</span>
-            <button onclick="document.getElementById('log-container').innerHTML=''" class="hover:text-white transition">CLEAR</button>
+            <div class="flex gap-3">
+                <button onclick="copyAllLogs()" class="text-[#888] hover:text-white transition"><i
+                        class="fas fa-copy mr-1"></i> Copy All
+                </button>
+                <button onclick="saveLogsToFile()" class="text-[#888] hover:text-white transition"><i
+                        class="fas fa-save mr-1"></i> Save to File
+                </button>
+                <button onclick="document.getElementById('log-container').innerHTML=''"
+                        class="text-red-500/50 hover:text-red-500 transition"><i class="fas fa-trash mr-1"></i> Clear
+                </button>
+            </div>
         </div>
-        <div id="log-container" class="flex-1 overflow-y-auto p-2 text-xs space-y-1 text-[#aaa]"></div>
+        <div id="log-container" class="flex-1 overflow-y-auto p-2 text-xs space-y-1 text-[#aaa] select-text"></div>
     </div>
 </main>
 
@@ -152,19 +186,27 @@
 <div id="review-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center">
     <div class="bg-[#1a1a1a] w-[90%] h-[85%] flex flex-col rounded-xl border border-[#333] overflow-hidden">
         <div class="p-6 border-b border-[#333] bg-[#151515] flex justify-between items-center">
-            <h3 class="text-2xl font-bold text-white font-[Orbitron]"><span data-i18n="modal_review_title">Review Files</span>: <span id="review-mod-name" class="text-[#888]">...</span></h3>
-            <div id="review-mod-type" class="px-4 py-1 bg-[#222] border border-[#ff8128] text-[#ff8128] rounded font-bold text-xs uppercase tracking-widest">UNKNOWN</div>
+            <h3 class="text-2xl font-bold text-white font-[Orbitron]"><span
+                    data-i18n="modal_review_title">Review Files</span>: <span id="review-mod-name" class="text-[#888]">...</span>
+            </h3>
+            <div id="review-mod-type"
+                 class="px-4 py-1 bg-[#222] border border-[#ff8128] text-[#ff8128] rounded font-bold text-xs uppercase tracking-widest">
+                UNKNOWN
+            </div>
         </div>
         <div class="flex-1 overflow-hidden flex flex-col md:flex-row min-h-0">
-             <div id="unmapped-panel" class="hidden md:w-1/3 border-r border-[#333] bg-[#111] flex flex-col">
+            <div id="unmapped-panel" class="hidden md:w-1/3 border-r border-[#333] bg-[#111] flex flex-col">
                 <div class="p-3 bg-red-900/10 text-red-500 font-bold text-xs uppercase border-b border-red-900/20">
-                    <i class="fas fa-exclamation-triangle mr-2"></i> <span data-i18n="modal_ignored">Ignored Files</span>
+                    <i class="fas fa-exclamation-triangle mr-2"></i> <span
+                        data-i18n="modal_ignored">Ignored Files</span>
                 </div>
-                <div id="unmapped-list" class="flex-1 overflow-auto p-4 text-xs font-mono text-red-400/60 space-y-1"></div>
+                <div id="unmapped-list"
+                     class="flex-1 overflow-auto p-4 text-xs font-mono text-red-400/60 space-y-1"></div>
             </div>
             <div class="flex-1 flex flex-col bg-[#1a1a1a]">
                 <div class="p-3 bg-[#111] text-[#22c55e] font-bold text-xs uppercase border-b border-[#333]">
-                    <i class="fas fa-check-circle mr-2"></i> <span data-i18n="modal_install_list">Files to Install</span>
+                    <i class="fas fa-check-circle mr-2"></i> <span
+                        data-i18n="modal_install_list">Files to Install</span>
                 </div>
                 <div id="mapped-list" class="flex-1 overflow-y-auto bg-[#0f0f0f]">
                     <div id="mapped-rows" class="divide-y divide-[#222]"></div>
@@ -180,7 +222,9 @@
 
 <div id="hof-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center">
     <div class="bg-[#1a1a1a] w-[90%] h-[90%] flex flex-col rounded-xl shadow-2xl border border-[#333] relative">
-        <button onclick="document.getElementById('hof-modal').classList.add('hidden')" class="absolute top-4 right-4 text-[#888] hover:text-white"><i class="fas fa-times text-xl"></i></button>
+        <button onclick="document.getElementById('hof-modal').classList.add('hidden')"
+                class="absolute top-4 right-4 text-[#888] hover:text-white"><i class="fas fa-times text-xl"></i>
+        </button>
         <div class="p-6 border-b border-[#333] bg-[#151515]">
             <h3 class="text-2xl font-bold text-white font-[Orbitron] flex items-center gap-2">
                 <span class="text-[#ff8128]">HOF</span> MANAGER
@@ -189,32 +233,41 @@
         <div class="flex-1 flex overflow-hidden">
             <div class="w-1/2 border-r border-[#333] flex flex-col p-4 bg-[#111]">
                 <div class="flex justify-between items-center mb-3">
-                    <h4 class="font-bold text-[#e0e0e0] uppercase text-xs tracking-wider" data-i18n="lbl_select_hof">1. Select HOF</h4>
+                    <h4 class="font-bold text-[#e0e0e0] uppercase text-xs tracking-wider" data-i18n="lbl_select_hof">1.
+                        Select HOF</h4>
                     <span id="hof-count" class="text-xs text-[#ff8128] font-mono">0</span>
                 </div>
                 <div id="hof-list-container" class="flex-1 overflow-y-auto space-y-1 pr-2"></div>
             </div>
             <div class="w-1/2 flex flex-col p-4 bg-[#161616]">
                 <div class="flex justify-between items-center mb-3">
-                    <h4 class="font-bold text-[#e0e0e0] uppercase text-xs tracking-wider" data-i18n="lbl_select_bus">2. Select Buses</h4>
-                    <button id="btn-select-all-buses" class="text-xs text-[#ff8128] hover:underline" data-i18n="btn_select_all">Select All</button>
+                    <h4 class="font-bold text-[#e0e0e0] uppercase text-xs tracking-wider" data-i18n="lbl_select_bus">2.
+                        Select Buses</h4>
+                    <button id="btn-select-all-buses" class="text-xs text-[#ff8128] hover:underline"
+                            data-i18n="btn_select_all">Select All
+                    </button>
                 </div>
                 <div id="bus-list-container" class="flex-1 overflow-y-auto space-y-1 pr-2"></div>
             </div>
         </div>
         <div class="p-5 border-t border-[#333] bg-[#151515] flex justify-between items-center">
             <div class="flex gap-2">
-                <button id="btn-scan-game-hof" class="btn btn-secondary text-xs"><i class="fas fa-search mr-1"></i> <span data-i18n="btn_scan_game">Scan Game</span></button>
-                <button id="btn-uninstall-hofs" class="text-xs text-[#888] hover:text-red-500 transition px-3" data-i18n="btn_reset_hof">Reset All</button>
+                <button id="btn-scan-game-hof" class="btn btn-secondary text-xs"><i class="fas fa-search mr-1"></i>
+                    <span data-i18n="btn_scan_game">Scan Game</span></button>
+                <button id="btn-uninstall-hofs" class="text-xs text-[#888] hover:text-red-500 transition px-3"
+                        data-i18n="btn_reset_hof">Reset All
+                </button>
             </div>
             <button id="btn-install-hofs" class="btn btn-primary px-8" data-i18n="btn_inject">INJECT</button>
         </div>
     </div>
 </div>
 
-<div id="loading-modal" class="hidden fixed inset-0 bg-black/95 backdrop-blur-sm z-[70] flex flex-col items-center justify-center">
+<div id="loading-modal"
+     class="hidden fixed inset-0 bg-black/95 backdrop-blur-sm z-[70] flex flex-col items-center justify-center">
     <div class="text-[#ff8128] text-4xl mb-4 animate-bounce"><i class="fas fa-cog fa-spin"></i></div>
-    <h3 id="loading-title" class="text-xl font-bold text-white mb-2 font-[Orbitron]" data-i18n="loading_process">PROCESSING</h3>
+    <h3 id="loading-title" class="text-xl font-bold text-white mb-2 font-[Orbitron]" data-i18n="loading_process">
+        PROCESSING</h3>
     <div class="w-64 bg-[#333] rounded-full h-1 mt-2 overflow-hidden">
         <div id="progress-bar" class="bg-[#ff8128] h-full transition-all duration-300" style="width: 0%"></div>
     </div>

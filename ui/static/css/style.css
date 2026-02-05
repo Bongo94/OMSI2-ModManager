@@ -125,3 +125,9 @@ h1, h2, h3, .brand-font {
 .toggle-checkbox:checked + .toggle-label {
     background-color: var(--accent);
 }
+
+/* --- Selection Styles for Logs --- */
+#log-container::selection {
+    background-color: var(--accent); /* Оранжевый фон */
+    color: #000; /* Черный текст */
+}

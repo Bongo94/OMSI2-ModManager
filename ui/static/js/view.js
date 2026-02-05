@@ -52,8 +52,8 @@ const View = {
     addLog: (msg, level) => {
         const container = document.getElementById('log-container');
         const line = document.createElement('div');
-
         const time = new Date().toLocaleTimeString('ru-RU');
+
         let colorClass = 'text-[#aaa]'; // Default gray
         let prefix = 'INFO';
         let prefixColor = 'text-[#555]';
@@ -74,17 +74,21 @@ const View = {
             prefixColor = 'text-green-500';
         }
 
+        // Простой, единый формат для всех сообщений
         line.innerHTML = `
-            <span class="text-[#444] select-none mr-2 font-mono">[${time}]</span>
-            <span class="${prefixColor} w-8 inline-block text-[10px]">${prefix}</span> 
-            <span class="${colorClass}">${msg}</span>
+            <div>
+                <span class="text-[#444] mr-2 font-mono">[${time}]</span>
+                <span class="${prefixColor} w-8 inline-block text-[10px]">${prefix}</span> 
+                <span class="${colorClass} whitespace-pre-wrap">${msg}</span>
+            </div>
         `;
+
         container.appendChild(line);
         container.scrollTop = container.scrollHeight;
     },
 
     // --- Таблица модов (Grid Layout) ---
-renderModList: (mods) => {
+    renderModList: (mods) => {
         const container = document.getElementById('mod-table-body');
         const emptyState = document.getElementById('empty-state');
         container.innerHTML = '';

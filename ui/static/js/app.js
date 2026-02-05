@@ -26,6 +26,36 @@ window.changeLang = async (lang) => {
     }
 };
 
+// --- LOG MANAGEMENT FUNCTIONS ---
+window.copyAllLogs = () => {
+    const logContainer = document.getElementById('log-container');
+    const textToCopy = logContainer.innerText;
+
+    navigator.clipboard.writeText(textToCopy)
+        .then(() => alert('Log copied to clipboard!'))
+        .catch(err => alert('Failed to copy log: ' + err));
+};
+
+window.saveLogsToFile = () => {
+    const logContainer = document.getElementById('log-container');
+    const textToSave = logContainer.innerText;
+
+    // Создаем невидимый элемент для скачивания
+    const blob = new Blob([textToSave], {type: 'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+
+    // Формируем имя файла с датой и временем
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
+    a.download = `omsi-manager-log_${timestamp}.txt`;
+
+    // Симулируем клик для скачивания
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+};
+
 // --- INIT ---
 window.addEventListener('pywebviewready', async function () {
     try {
@@ -432,4 +462,24 @@ document.getElementById('btn-uninstall-hofs').onclick = async () => {
     } else {
         alert(res.message);
     }
+};
+
+// --- НОВАЯ ФУНКЦИЯ КОПИРОВАНИЯ ---
+window.copyLog = (button) => {
+    // Находим текст ошибки рядом с кнопкой
+    const errorContainer = button.previousElementSibling;
+    const errorText = errorContainer.querySelector('.text-red-300').innerText;
+
+    navigator.clipboard.writeText(errorText)
+        .then(() => {
+            // Даем обратную связь пользователю
+            const originalText = button.innerText;
+            button.innerText = 'Copied!';
+            button.disabled = true;
+            setTimeout(() => {
+                button.innerText = originalText;
+                button.disabled = false;
+            }, 1500); // Возвращаем текст "Copy" через 1.5 секунды
+        })
+        .catch(err => console.error('Failed to copy log:', err));
 };

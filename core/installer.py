@@ -162,7 +162,12 @@ class ModInstaller:
                     backup_path=backup,
                     original_hash=orig_hash
                 ))
+            except PermissionError:
+                # Ловим конкретно ошибку доступа
+                error_msg = f"Access Denied to '{original_case_path}'. Try running the manager as an Administrator."
+                errors.append(error_msg)
             except Exception as e:
+                # Ловим все остальные ошибки
                 errors.append(f"Err inst {original_case_path}: {e}")
 
             current_op += 1
@@ -176,8 +181,15 @@ class ModInstaller:
         self.session.commit()
 
         if errors:
-            self.logger.log(f"Были ошибки ({len(errors)})", "warning")
-            return False, "Завершено с ошибками"
+            # Сообщение-заголовок
+            summary_msg = f"Завершено с ошибками ({len(errors)}). Детали ниже:"
+            self.logger.log(summary_msg, "warning")
+
+            # Отправляем каждую ошибку в лог отдельно
+            for error_detail in errors:
+                self.logger.log(str(error_detail), "error")  # Уровень 'error' для красного цвета
+
+            return False, summary_msg
 
         return True, "Успешно"
 
