@@ -152,8 +152,8 @@ renderModList: (mods) => {
         document.getElementById('unmapped-panel').classList.add('hidden');
 
         // Reset styles for full width
-        const rightPanel = document.getElementById('mapped-list').parentElement;
-        rightPanel.parentElement.classList.remove('md:flex-row'); // remove flex row if needed logic
+        // const rightPanel = document.getElementById('mapped-list').parentElement;
+        // rightPanel.parentElement.classList.remove('md:flex-row'); // remove flex row if needed logic
 
         let html = '';
         data.mapped_files.forEach(f => {
